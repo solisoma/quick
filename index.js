@@ -36,4 +36,6 @@ let db_connection = engine.connect('psql',{
 
 //structures location i:e te path to all your structures
 
-module.exports = {db_connection:db_connection}
+let structure_locations = ['./structure']
+
+module.exports = {db_connection:db_connection,structure_locations:structure_locations }
