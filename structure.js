@@ -1,6 +1,6 @@
 //contains both the fields and function to create tables
 
-let db_connection = require('./index.js').db_connection
+let {db_connection} = require('./index.js')
 let {tables} = require('./strt_tracker.js')
 
 //methods of table = define, drop, find, extract, append, val, order, collect, insert
@@ -155,7 +155,7 @@ class QuickTable{
 
         //save to db manually
         let save = ()=>{
-            var __values_ = insert().__statement__
+            var __values_ = this.insert().__statement__
 
             if(this.db_name === 'sqlite3'){
                 this.conn.run(__values_,[],(err,res)=>{
@@ -189,7 +189,8 @@ class QuickTable{
             Object.keys(db_instances).map((itm)=>{
                 columns.push(itm)
             })
-            let tables = {columns:columns,dataTypes:dataTypes}
+            let tables = {columns:columns,dataTypes:dataTypes,force:force}
+            console.log(tables)
             return tables
         }
 
@@ -197,11 +198,14 @@ class QuickTable{
     }
 }
 
-var myDataType = (max_length=false,allowNull=false)=>{
-
+var myDataType = (max_length=false,allowNull=false,name=null)=>{
+    var name = ()=>{
+        return 12
+    }
+    return {name:name}
 }
 
-var T = new QuickTable()
-var e = {favourite:'Varchar(200)'}
-var a = T.define('Sol',{name:'Varchar(200)',age:'int'},extra=e,force=false).collect()
-console.log(a)
+var table = new QuickTable()
+var e = {favourite:'Varchar(200)',male:'int'}
+var myTable = table.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
+myTable.collect()
