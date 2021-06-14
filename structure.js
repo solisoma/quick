@@ -132,9 +132,68 @@ class QuickTable{
             return {_values:_values,__statement__:statement}
         }
 
-        //capture a single row from a table
-        let find = (query,order=null,val=null)=>{
-
+        //capture a single row from a table query = {name:what it is,condition:OR||AND||NOT},
+        let find = (query,val=null,order=null,distinct=false,conDefault='AND',conOrder=[])=>{
+            let columns_ = `*`
+            let order_ = ``
+            if(val){ columns_ = val }
+            if(order){
+                var direction;
+                var regExp = /\>/igm;
+                direction = order.match(regExp)
+                if(!direction){
+                    var regExp2 = /\</igm;
+                    var value = order.replace(regExp2,'');
+                    order_ = ` ORDER BY ${value} ASC`
+                } else {
+                    var value = order.replace(regExp,'');
+                    order_ = ` ORDER BY ${value} DESC`
+                }
+            }
+            let select;
+            if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
+            let q = `${select} ${columns_} FROM ${table_name} WHERE `
+            let _index = Object.keys(query).length
+            let __counter_ = _index - 1
+            let z = 0
+            for(var i in query){
+                if(_index == 1){
+                    let __add__;
+                    if(query[i] == ''){
+                        __add__ = `${i} IS NULL`
+                    } else {
+                        __add__ = `${i}=${query[i]}`
+                    }
+                    q+= __add__
+                } else {
+                    let __add__;
+                    if(z < __counter_){
+                        if(query[i] == ''){
+                            __add__ = `${i} IS NULL`
+                        } else {
+                            __add__ = `${i}=${query[i]}`
+                        }
+                        let __add_condition;
+                        if(conDefault === 'AND'){
+                            __add_condition = ` AND `
+                        } else {
+                            __add_condition = ` ${conOrder[z]} `
+                        }
+                        __add__+= __add_condition
+                        q+= __add__
+                    } else {
+                        if(query[i] == ''){
+                            __add__ = `${i} IS NULL`
+                        } else {
+                            __add__ = `${i}=${query[i]}`
+                        }
+                        q+= __add__
+                    }
+                }
+                z++
+            }
+            q+=order_
+            console.log(q)
         }
 
         //pull all from the database
@@ -194,8 +253,19 @@ class QuickTable{
             return tables
         }
 
-        return {drop:drop,insert:insert,all:all,collect:collect,create:create,save:save/*,find:find,extract:extract,append:append*/}
+        return {drop:drop,insert:insert,all:all,collect:collect,create:create,save:save,find:find/*,extract:extract,append:append*/}
     }
+    quickCard(){
+        let not_in = () =>{}
+        let begin = () =>{}
+        let not_begin = () =>{}
+        let end = () =>{}
+        let not_end = () =>{}
+        let begin_and_end = () =>{}
+
+        return {not_in:not_in,begin:begin,not_begin:not_begin,end:end,not_end:not_end,begin_and_end:begin_and_end}
+    }
+    dataTypes(){}
 }
 
 var myDataType = (max_length=false,allowNull=false,name=null)=>{
@@ -206,6 +276,6 @@ var myDataType = (max_length=false,allowNull=false,name=null)=>{
 }
 
 var table = new QuickTable()
-var e = {favourite:'Varchar(200)',male:'int'}
+var e = {favourite:'Varchar(200)',male:''}
 var myTable = table.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-myTable.collect()
+myTable.find({name:'ikechukwu',love:'yes',...e},val=null,order='>name,love',distinct=true)
