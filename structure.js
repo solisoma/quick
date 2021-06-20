@@ -28,41 +28,42 @@ class QuickTable{
             let regOr = /\_/igm
             let m_val = val.replace(regOr,'')
             if(fin){
-                result = `'${m_val}'`
+                result = `='${m_val}'`
             } else {
-                result = `'${m_val}' OR `
+                result = `='${m_val}' OR `
             }
         }
         if(checkAndNot){
             let regNot = /\__/igm
             let m_val = val.replace(regNot,'')
             if(fin){
-                result = `'${m_val}'`
+                result = `='${m_val}'`
             } else {
-                result = `'${m_val}' AND NOT `
+                result = `='${m_val}' AND NOT `
             }
         }
         if(checkOrNot){
             let regNot = /\___/igm
             let m_val = val.replace(regNot,'')
             if(fin){
-                result = `'${m_val}'`
+                result = `='${m_val}'`
             } else {
-                result = `'${m_val}' OR NOT `
+                result = `='${m_val}' OR NOT `
             }
         }
         if(!checkOrNot && !checkOr && !checkAndNot){
             let m_val = val
             if(fin){
-                result = `'${m_val}'`
+                result = `='${m_val}'`
             } else {
-                result = `'${m_val}' AND `
+                result = `='${m_val}' AND `
             }
         }
         return result
     }
+
     parseFunc(func){
-        let RegExp = /\<\{[A-Za-z0-9\.\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let check = func.match(RegExp)
 
         let result;
@@ -76,8 +77,57 @@ class QuickTable{
         return result
     }
 
+    parseFuncVal(val,fin){
+        let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+(\_{1})/igm
+        let conAndNotRegExp = /([A-Za-z0-9\.\:\(\)\;\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+)(\__{1})/igm
+        let conOrNotRegExp = /([A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+)(\___{1})/igm
+
+        let checkOr = val.match(conOrRegExp)
+        let checkAndNot = val.match(conAndNotRegExp)
+        let checkOrNot = val.match(conOrNotRegExp)
+
+        let result;
+
+        if(checkOr){
+            let regOr = /\_/igm
+            let m_val = val.replace(regOr,'')
+            if(fin){
+                result = ` ${m_val}`
+            } else {
+                result = ` ${m_val} OR `
+            }
+        }
+        if(checkAndNot){
+            let regNot = /\__/igm
+            let m_val = val.replace(regNot,'')
+            if(fin){
+                result = ` ${m_val}`
+            } else {
+                result = ` ${m_val} AND NOT `
+            }
+        }
+        if(checkOrNot){
+            let regNot = /\___/igm
+            let m_val = val.replace(regNot,'')
+            if(fin){
+                result = ` ${m_val}`
+            } else {
+                result = ` ${m_val} OR NOT `
+            }
+        }
+        if(!checkOrNot && !checkOr && !checkAndNot){
+            let m_val = val
+            if(fin){
+                result = ` ${m_val}`
+            } else {
+                result = ` ${m_val} AND `
+            }
+        }
+        return result
+    }
+
     parseAll(val,fin){
-        let RegExp = /\<\{[A-Za-z0-9\.\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let check = val.match(RegExp)
 
         let result;
@@ -85,9 +135,9 @@ class QuickTable{
         if(check){
             let first_step = this.parseFunc(val)
             if(fin){
-                result = this.parseVal(first_step,fin)
+                result = this.parseFuncVal(first_step,fin)
             } else {
-                result = this.parseVal(first_step)
+                result = this.parseFuncVal(first_step)
             }
         } else {
             if(fin){
@@ -204,7 +254,6 @@ class QuickTable{
             __columns__+=')'
             __values__+=')'
             statement = `${__columns__} VALUES ${__values__}`
-            console.log(statement)
 
             if(this.db_name === 'sqlite3'){
                 this.conn.run(statement,[],(err,res)=>{
@@ -217,7 +266,7 @@ class QuickTable{
                     console.log(/**/)
                 })
             }
-            return {_values:_values,__statement__:statement}
+            return {values:_values,__statement__:statement}
         }
 
         //capture a single row from a table query = {name:what it is,condition:OR||AND||NOT},
@@ -250,7 +299,7 @@ class QuickTable{
                     if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                         __add__ = `${i} IS NULL`
                     } else {
-                        __add__ = `${i}=${this.parseAll(query[i],'final')}`
+                        __add__ = `${i}${this.parseAll(query[i],'final')}`
                     }
                     q+= __add__
                 } else {
@@ -259,14 +308,14 @@ class QuickTable{
                         if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                             __add__ = `${i} IS NULL`
                         } else {
-                            __add__ = `${i}=${this.parseAll(query[i])}`
+                            __add__ = `${i}${this.parseAll(query[i])}`
                         }
                         q+= __add__
                     } else {
                         if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                             __add__ = `${i} IS NULL`
                         } else {
-                            __add__ = `${i}=${this.parseAll(query[i],'final')}`
+                            __add__ = `${i}${this.parseAll(query[i],'final')}`
                         }
                         q+= __add__
                     }
@@ -274,7 +323,6 @@ class QuickTable{
                 z++
             }
             q+=order_
-            console.log(q)
             if(this.db_name == 'sqlite3'){
                 this.conn.get(q,[],(err,res)=>{
                     if(err) throw err
@@ -283,15 +331,17 @@ class QuickTable{
             }else{
                 this.conn.query(q,(err,res)=>{
                     if(err) throw err
-                    console.log(res.rows.map((inx)=>inx.favourite))
+                    console.log(res.rows)
                 })
             }
 
         }
 
         //pull all from the database
-        let all = (order=null,distinct=false)=>{
+        let all = (val=null,order=null,distinct=false)=>{
             let order_ = ``
+            let columns_ = `*`
+            if(val){ columns_ = val }
             if(order){
                 var direction;
                 var regExp = /\>/igm;
@@ -307,7 +357,7 @@ class QuickTable{
             }
             let select;
             if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
-            let a = `${select} * FROM ${table_name}`
+            let a = `${select} ${columns_} FROM ${table_name}`
             a+=order_
             if(this.db_name == 'sqlite3'){
                 this.conn.run(a,(err,res)=>{
@@ -365,31 +415,87 @@ class QuickTable{
 
         return {drop:drop,insert:insert,all:all,collect:collect,create:create,save:save,find:find/*,extract:extract,append:append*/}
     }
-    beginsWith(a,c){
-        return `<{LIKE ${a}%${c}>`
-    }
-    endsWith(a,c){
-        return `<{LIKE %${a}${c}}>`
-    }
-    begins_and_endswith(start='null',end='null',c){
-        return `<{LIKE ${start}%${end}${c}}>`
-    }
-    notIn(a,c){
-        return `NOT IN (${a}${c})`
-    }
-    isIn(a,c){
-        return `<{IN (${a}${c})}>`
-    }
-    between(start='null',end='null',c){
-        return `<{BETWEEN ${start} AND ${end}${c}}>`
-    }
-    notBetween(start='null',end='null',c){
-        return `<{NOT BETWEEN ${start} AND ${end}${c}}>`
-    }
-    contains(a,con){
-        let c = '__'
+
+    beginsWith(a,con){
+        var c = ''
         if(con){ c = con }
-        return `<{LIKE %${a}%${c}}>`
+        return `<{LIKE '${a}%'${c}}>`
+    }
+
+    endsWith(a,con){
+        var c = ''
+        if(con){ c = con }
+        return `<{LIKE '%${a}'${c}}>`
+    }
+
+    begins_and_endswith(start='null',end='null',con){
+        var c = ''
+        if(con){ c = con }
+        return `<{LIKE '${start}%${end}'${c}}>`
+    }
+
+    notIn(a,con){
+        var c = ''
+        if(con){ c = con }
+        var put_in = ''
+        if(a.length == 1){ put_in = `'${a[0]}'` }
+        a.map((itm)=>{
+            var a;
+            if(put_in == ''){
+                a = `'${itm}'`
+            } else {
+                a = `,'${itm}'`
+            }
+          put_in += a
+        })
+        return `<{NOT IN (${put_in}${c})}>`
+    }
+
+    isIn(a,con){
+        var c = ''
+        if(con){ c = con }
+        var put_in = ''
+        if(a.length == 1){ put_in = `'${a[0]}'` }
+        a.map((itm)=>{
+            var a;
+            if(put_in == ''){
+                a = `'${itm}'`
+            } else {
+                a = `,'${itm}'`
+            }
+          put_in += a
+        })
+        return `<{IN (${put_in}${c})}>`
+    }
+
+    between(start='null',end='null',con){
+        var c = ''
+        if(con){ c = con }
+        var res = ''
+        if( typeof(start) == 'number' && typeof(end) == 'number' ){
+            res = `<{BETWEEN ${start} AND ${end}${c}}>`
+        } else {
+            res = `<{BETWEEN '${start}' AND '${end}'${c}}>`
+        }
+        return res
+    }
+
+    notBetween(start='null',end='null',con){
+        var c = ''
+        if(con){ c = con }
+        var res = ''
+        if( typeof(start) == 'number' && typeof(end) == 'number' ){
+            res = `<{NOT BETWEEN ${start} AND ${end}${c}}>`
+        } else {
+            res = `<{NOT BETWEEN '${start}' AND '${end}'${c}}>`
+        }
+        return res
+    }
+
+    contains(a,con){
+        var c = ''
+        if(con){ c = con }
+        return `<{LIKE '%${a}%'${c}}>`
     }
     dataTypes(){}
 }
@@ -402,8 +508,8 @@ var myDataType = (max_length=false,allowNull=false,name=null)=>{
 }
 
 var table = new QuickTable()
-var e = {favourite:'red',male:'false',age:'19'}
+var e = {favourite:table.contains('red')}
 var myTable = table.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-myTable.find({name:'__'},val=null,order='name',distinct=false)
+myTable.all(val=null,order='age',distinct=false)
 
 //how to change value on runtime
