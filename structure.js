@@ -63,7 +63,7 @@ class QuickTable{
     }
 
     parseFunc(func){
-        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let check = func.match(RegExp)
 
         let result;
@@ -78,9 +78,9 @@ class QuickTable{
     }
 
     parseFuncVal(val,fin){
-        let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+(\_{1})/igm
-        let conAndNotRegExp = /([A-Za-z0-9\.\:\(\)\;\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+)(\__{1})/igm
-        let conOrNotRegExp = /([A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\'\"\s]+)(\___{1})/igm
+        let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+(\_{1})/igm
+        let conAndNotRegExp = /([A-Za-z0-9\.\:\(\)\;\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+)(\__{1})/igm
+        let conOrNotRegExp = /([A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+)(\___{1})/igm
 
         let checkOr = val.match(conOrRegExp)
         let checkAndNot = val.match(conAndNotRegExp)
@@ -127,7 +127,7 @@ class QuickTable{
     }
 
     parseAll(val,fin){
-        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let check = val.match(RegExp)
 
         let result;
@@ -270,9 +270,10 @@ class QuickTable{
         }
 
         //capture a single row from a table query = {name:what it is,condition:OR||AND||NOT},
-        let find = (query,val=null,order=null,distinct=false)=>{
+        let find = (query,val=null,order=null,group=null,distinct=false)=>{
             let columns_ = `*`
             let order_ = ``
+            let group_ = ``
             if(val){ columns_ = val }
             if(order){
                 var direction;
@@ -287,6 +288,11 @@ class QuickTable{
                     order_ = ` ORDER BY ${value} DESC`
                 }
             }
+
+            if(group){
+                group_ = ` GROUP BY ${group}`
+            }
+
             let select;
             if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
             let q = `${select} ${columns_} FROM ${table_name} WHERE `
@@ -322,7 +328,9 @@ class QuickTable{
                 }
                 z++
             }
+            q+=group_
             q+=order_
+            console.log(q)
             if(this.db_name == 'sqlite3'){
                 this.conn.get(q,[],(err,res)=>{
                     if(err) throw err
@@ -338,8 +346,9 @@ class QuickTable{
         }
 
         //pull all from the database
-        let all = (val=null,order=null,distinct=false)=>{
+        let all = (val=null,order=null,group=null,distinct=false)=>{
             let order_ = ``
+            let group_ = ``
             let columns_ = `*`
             if(val){ columns_ = val }
             if(order){
@@ -355,9 +364,14 @@ class QuickTable{
                     order_ = ` ORDER BY ${value} DESC`
                 }
             }
+
+            if(group){
+                group_ = ` GROUP BY ${group} `
+            }
             let select;
             if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
             let a = `${select} ${columns_} FROM ${table_name}`
+            a+=group_
             a+=order_
             if(this.db_name == 'sqlite3'){
                 this.conn.run(a,(err,res)=>{
@@ -438,7 +452,6 @@ class QuickTable{
         var c = ''
         if(con){ c = con }
         var put_in = ''
-        if(a.length == 1){ put_in = `'${a[0]}'` }
         a.map((itm)=>{
             var a;
             if(put_in == ''){
@@ -455,7 +468,6 @@ class QuickTable{
         var c = ''
         if(con){ c = con }
         var put_in = ''
-        if(a.length == 1){ put_in = `'${a[0]}'` }
         a.map((itm)=>{
             var a;
             if(put_in == ''){
@@ -497,6 +509,69 @@ class QuickTable{
         if(con){ c = con }
         return `<{LIKE '%${a}%'${c}}>`
     }
+
+    count(a,comma=false){
+        var res;
+        if(comma){
+            res = `COUNT(${a}),`
+        } else {
+            res = `COUNT(${a})`
+        }
+        return res
+    }
+
+    avg(a,comma=false){
+        var res;
+        if(comma){
+            res = `AVG(${a}),`
+        } else {
+            res = `AVG(${a})`
+        }
+        return res
+    }
+
+    sum(a,comma=false){
+        var res;
+        if(comma){
+            res = `SUM(${a}),`
+        } else {
+            res = `SUM(${a})`
+        }
+        return res
+    }
+
+    max(a,comma=false){
+        var res;
+        if(comma){
+            res = `MAX(${a}),`
+        } else {
+            res = `MAX(${a})`
+        }
+        return res
+    }
+
+    min(a,comma=false){
+        var res;
+        if(comma){
+            res = `MIN(${a}),`
+        } else {
+            res = `MIN(${a})`
+        }
+        return res
+    }
+
+    gt(a){
+        return `<{>'${a}'}>`
+    }
+    lt(a){
+        return `<{<'${a}'}>`
+    }
+    gte(a){
+        return `<{>='${a}'}>`
+    }
+    lte(a){
+        return `<{<='${a}'}>`
+    }
     dataTypes(){}
 }
 
@@ -507,9 +582,9 @@ var myDataType = (max_length=false,allowNull=false,name=null)=>{
     return {name:name}
 }
 
-var table = new QuickTable()
-var e = {favourite:table.contains('red')}
-var myTable = table.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-myTable.all(val=null,order='age',distinct=false)
+var quick = new QuickTable()
+var e = {favourite:quick.isIn(['red']),age:quick.gte(10)}
+var myTable = quick.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
+myTable.find({...e},val=quick.count('age'),order=null,group='age',distinct=false)
 
 //how to change value on runtime
