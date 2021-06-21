@@ -339,6 +339,82 @@ class QuickTable{
             }else{
                 this.conn.query(q,(err,res)=>{
                     if(err) throw err
+                    console.log(res.rows[0])
+                })
+            }
+
+        }
+
+        //get all from db
+        let extract = (query,val=null,order=null,group=null,distinct=false)=>{
+            let columns_ = `*`
+            let order_ = ``
+            let group_ = ``
+            if(val){ columns_ = val }
+            if(order){
+                var direction;
+                var regExp = /\>/igm;
+                direction = order.match(regExp)
+                if(!direction){
+                    var regExp2 = /\</igm;
+                    var value = order.replace(regExp2,'');
+                    order_ = ` ORDER BY ${value} ASC`
+                } else {
+                    var value = order.replace(regExp,'');
+                    order_ = ` ORDER BY ${value} DESC`
+                }
+            }
+
+            if(group){
+                group_ = ` GROUP BY ${group}`
+            }
+
+            let select;
+            if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
+            let q = `${select} ${columns_} FROM ${table_name} WHERE `
+            let _index = Object.keys(query).length
+            let __counter_ = _index - 1
+            let z = 0
+            for(var i in query){
+                if(_index == 1){
+                    let __add__;
+                    if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                        __add__ = `${i} IS NULL`
+                    } else {
+                        __add__ = `${i}${this.parseAll(query[i],'final')}`
+                    }
+                    q+= __add__
+                } else {
+                    let __add__;
+                    if(z < __counter_){
+                        if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                            __add__ = `${i} IS NULL`
+                        } else {
+                            __add__ = `${i}${this.parseAll(query[i])}`
+                        }
+                        q+= __add__
+                    } else {
+                        if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                            __add__ = `${i} IS NULL`
+                        } else {
+                            __add__ = `${i}${this.parseAll(query[i],'final')}`
+                        }
+                        q+= __add__
+                    }
+                }
+                z++
+            }
+            q+=group_
+            q+=order_
+            console.log(q)
+            if(this.db_name == 'sqlite3'){
+                this.conn.all(q,[],(err,res)=>{
+                    if(err) throw err
+                    console.log(res)
+                })
+            }else{
+                this.conn.query(q,(err,res)=>{
+                    if(err) throw err
                     console.log(res.rows)
                 })
             }
@@ -384,6 +460,7 @@ class QuickTable{
                     console.log(res.rows)
                 })
             }
+
         }
 
         //save to db manually
@@ -427,7 +504,7 @@ class QuickTable{
             return tables
         }
 
-        return {drop:drop,insert:insert,all:all,collect:collect,create:create,save:save,find:find/*,extract:extract,append:append*/}
+        return {drop:drop,insert:insert,all:all,collect:collect,create:create,save:save,find:find,extract:extract/*,append:append*/}
     }
 
     beginsWith(a,con){
@@ -563,12 +640,15 @@ class QuickTable{
     gt(a){
         return `<{>'${a}'}>`
     }
+
     lt(a){
         return `<{<'${a}'}>`
     }
+
     gte(a){
         return `<{>='${a}'}>`
     }
+
     lte(a){
         return `<{<='${a}'}>`
     }
@@ -585,6 +665,6 @@ var myDataType = (max_length=false,allowNull=false,name=null)=>{
 var quick = new QuickTable()
 var e = {favourite:quick.isIn(['red']),age:quick.gte(10)}
 var myTable = quick.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-myTable.find({...e},val=quick.count('age'),order=null,group='age',distinct=false)
+myTable.all(val=quick.count('age',comma=true)+'name',order=null,group='name',distinct=false)
 
 //how to change value on runtime
