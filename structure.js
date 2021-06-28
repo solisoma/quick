@@ -668,3 +668,4 @@ var myTable = quick.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
 myTable.all(val=quick.count('age',comma=true)+'name',order=null,group='name',distinct=false)
 
 //how to change value on runtime
+//append is based on id of the elements join them
