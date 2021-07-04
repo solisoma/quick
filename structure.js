@@ -499,7 +499,7 @@ class QuickTable{
             Object.keys(db_instances).map((itm)=>{
                 columns.push(itm)
             })
-            let tables = {columns:columns,dataTypes:dataTypes,force:force}
+            let tables = {table_name,columns:columns,dataTypes:dataTypes,force:force}
             console.log(tables)
             return tables
         }
@@ -662,10 +662,132 @@ var myDataType = (max_length=false,allowNull=false,name=null)=>{
     return {name:name}
 }
 
+/*
+SELECT customerName, customercity, customermail, salestotal
+FROM onlinecustomers AS oc
+   INNER JOIN
+   orders AS o
+   ON oc.customerid = o.customerid
+   ***WHERE CLAUSE COME IN***
+   INNER JOIN
+   sales AS s
+   ON o.orderId = s.orderId
+*/
+var main = [
+  {
+    favourite: 'red',
+    id:1,
+    male: true,
+    name: 'ikechukwu',
+    love: 'yes',
+    age: 10
+  },
+  {
+    favourite: 'blue',
+    id:2,
+    male: true,
+    name: 'solisoma',
+    love: 'no',
+    age: 19
+  },
+  {
+    favourite: 'blue',
+    id:3,
+    male: true,
+    name: 'alolisoma',
+    love: 'no',
+    age: 19
+  },
+  { favourite: 'red', id:4, male: false, name: null, love: 'yes', age: 19 }
+]
+
+var n = [
+  {
+    favourite: 'red',
+    male: true,
+    id:2,
+    name: 'ikechukwu',
+    love: 'yes',
+    age: 10
+  },
+  {
+    favourite: 'blue',
+    male: true,
+    id:1,
+    name: 'solisoma',
+    love: 'no',
+    age: 19
+  },
+  {
+    favourite: 'blue',
+    male: true,
+    id:4,
+    name: 'alolisoma',
+    love: 'no',
+    age: 19
+  },
+  { favourite: 'red', id:3, male: false, name: null, love: 'yes', age: 19 }
+]
+
+var m = [
+  {
+    favourite: 'red',
+    male: true,
+    id:3,
+    name: 'ikechukwu',
+    love: 'yes',
+    age: 10
+  },
+  {
+    favourite: 'blue',
+    male: true,
+    id:2,
+    name: 'solisoma',
+    love: 'no',
+    age: 19
+  },
+  {
+    favourite: 'blue',
+    male: true,
+    id:4,
+    name: 'alolisoma',
+    love: 'no',
+    age: 19
+  },
+  { favourite: 'red', id:1, male: false, name: null, love: 'yes', age: 19 }
+]
+
+//var a = append(main,{a:[query1,query1_body]}) or append(main,{a:[query1]})
+var append = (m_query,a_query) => {
+    let main_query = m_query
+    console.log(m_query)
+
+    var add = (m,y,z,lk)=>{
+        let result = m
+        m.map((i,x)=>{
+            i[lk] === y[lk] ? result[x][z] = y :null
+        })
+        return result
+    }
+
+    for(var n in a_query){
+        a_query[n][0].map(y=>{
+            let lk;
+            a_query[n][1] ? lk = a_query[n][1] : lk = 'id'
+            var get_it = add(main_query,y,n,lk)
+            main_query = get_it
+        })
+    }
+
+    return main_query
+}
+
 var quick = new QuickTable()
 var e = {favourite:quick.isIn(['red']),age:quick.gte(10)}
 var myTable = quick.define('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-myTable.all(val=quick.count('age',comma=true)+'name',order=null,group='name',distinct=false)
+var c = myTable.all()
+var a = append(c,{house:[main,'favourite'],motor:[n,'age'],car:[m]})
+console.log(a)
 
 //how to change value on runtime
 //append is based on id of the elements join them
