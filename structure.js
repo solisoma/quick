@@ -563,7 +563,7 @@ class QuickTable{
         for(var n in a_query){
             let lk;
             a_query[n][1] ? lk = a_query[n][1] : lk = 'id'
-            if( Array.isArray(m) ) {
+            if( Array.isArray(m_query) ) {
                a_query[n][0].map(y=>{
                     var get_it = add(main_query,y,n,lk)
                     main_query = get_it
@@ -1028,7 +1028,7 @@ class DataType{
 }
 
 
-/*
+
 var main = [
   {
     favourite: 'red',
@@ -1117,13 +1117,15 @@ var m = [
 var datatype = new DataType()
 var e = {favourite:Operators().isIn(['blue']),male:true}
 var myTable = new QuickTable('MADZ',{name:datatype.qVarchar(),age:datatype.qInt()})
-myTable.insert({name:'ikechukwu',age:'10',favourite:'blue'});
+var myTable2 = new QuickTable('SOLI',{name:datatype.qVarchar(),age:datatype.qInt()})
+//myTable.insert({name:'ikechukwu',age:'10',favourite:'blue'});
 var c = (async()=>{
     let response = await myTable.find({name:'ikechukwu',...e},val='age,name,favourite',order='<age')
-    let appendData = myTable.append(response,{'love':[main,'age']})
+    let response2 = await myTable2.find({name:'madzworld'},val='age')
+    let appendData = myTable.append(response,{'love':[response2,'age']})
     console.log(appendData)
 })()
-myTable.create()
+/*myTable.create()
 var t = initDataType('BigInt',Update=false,Delete=false,Width=true)
 var d = t.field(Null=true,defaultValue='soli',primaryKey=true,width=10,onUpdate=true)
 console.log(d.value)*/
