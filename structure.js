@@ -157,22 +157,28 @@ class QuickTable{
 
     parseAll(val,fin){
         let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
-        let check = val.match(RegExp)
-
         let result;
-
-        if(check){
-            let first_step = this.parseFunc(val)
-            if(fin){
-                result = this.parseFuncVal(first_step,fin)
+        if (val !== true && val !== false){
+            let check = val.match(RegExp);
+            if(check){
+                let first_step = this.parseFunc(val)
+                if(fin){
+                    result = this.parseFuncVal(first_step,fin)
+                } else {
+                    result = this.parseFuncVal(first_step)
+                }
             } else {
-                result = this.parseFuncVal(first_step)
+                if(fin){
+                    result = this.parseVal(val,fin)
+                } else {
+                    result = this.parseVal(val)
+                }
             }
         } else {
-            if(fin){
-                result = this.parseVal(val,fin)
-            } else {
-                result = this.parseVal(val)
+            if( val === true ){
+                result = `='true'`
+            } else if( val === false ){
+                result = `='false'`
             }
         }
         return result
@@ -190,18 +196,18 @@ class QuickTable{
 
         if(this.extra !== null){
             for(var f in this.extra){
-                let __q__ = `${f.toString()} ${this.extra[f].toString()},`
+                let __q__ = `${f.toString()} ${this.extra[f].value.toString()},`
                 statement += __q__
             }
             for(var f in this.db_instances){
                 let __r__;
                 if(_d_list.length == 1){
-                     __r__ = `${f.toString()} ${this.db_instances[f].toString()}`;
+                     __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
                 }else{
                     if(i < __counter__){
-                         __r__ = `${f.toString()} ${this.db_instances[f].toString()},`;
+                         __r__ = `${f.toString()} ${this.db_instances[f].value.toString()},`;
                     }else{
-                         __r__ = `${f.toString()} ${this.db_instances[f].toString()}`;
+                         __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
                     }
                 }
                 i++
@@ -211,15 +217,15 @@ class QuickTable{
         }else{
             for(var f in this.db_instances){
                 if(_d_list.length === 1){
-                    let __r__ = `${f.toString()} ${this.db_instances[f].toString()}`;
+                    let __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
                     statement += __r__
                 }else{
                     let __r__ ;
 
                     if(i < __counter__){
-                       __r__ = `${f.toString()} ${this.db_instances[f].toString()},`;
+                       __r__ = `${f.toString()} ${this.db_instances[f].value.toString()},`;
                     }else{
-                       __r__ = `${f.toString()} ${this.db_instances[f].toString()}`;
+                       __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
                     }
                     i++
                     statement+=__r__
@@ -352,7 +358,7 @@ class QuickTable{
         for(var i in query){
             if(_index == 1){
                 let __add__;
-                if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                     __add__ = `${i} IS NULL`
                 } else {
                     __add__ = `${i}${this.parseAll(query[i],'final')}`
@@ -361,14 +367,14 @@ class QuickTable{
             } else {
                 let __add__;
                 if(z < __counter_){
-                    if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                         __add__ = `${i} IS NULL`
                     } else {
                         __add__ = `${i}${this.parseAll(query[i])}`
                     }
                     q+= __add__
                 } else {
-                    if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                         __add__ = `${i} IS NULL`
                     } else {
                         __add__ = `${i}${this.parseAll(query[i],'final')}`
@@ -431,7 +437,7 @@ class QuickTable{
         for(var i in query){
             if(_index == 1){
                 let __add__;
-                if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                     __add__ = `${i} IS NULL`
                 } else {
                     __add__ = `${i}${this.parseAll(query[i],'final')}`
@@ -440,14 +446,14 @@ class QuickTable{
             } else {
                 let __add__;
                 if(z < __counter_){
-                    if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                         __add__ = `${i} IS NULL`
                     } else {
                         __add__ = `${i}${this.parseAll(query[i])}`
                     }
                     q+= __add__
                 } else {
-                    if(query[i] == '' || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___' && query[i] !== false){
                         __add__ = `${i} IS NULL`
                     } else {
                         __add__ = `${i}${this.parseAll(query[i],'final')}`
@@ -545,7 +551,11 @@ class QuickTable{
                     i[lk] == y[lk] ? result[x][z] = y : null
                 })
             } else {
-                m[lk] == y[lk] ? result[z] = y : null
+                if(m === undefined){
+                    result = 'No row is returned'
+                } else {
+                    m[lk] == y[lk] ? result[z] = y : null
+                }
             }
             return result
         }
@@ -569,10 +579,9 @@ class QuickTable{
         }
         return main_query
     }
-    dataTypes(){}
 }
 
-let shorthands = () => {
+let Operators = () => {
     let beginsWith = (a,con) => {
         var c = ''
         if(con){ c = con }
@@ -722,25 +731,305 @@ let shorthands = () => {
     return {beginsWith, endsWith, begins_and_endswith, notIn, isIn,between, notBetween, contains, count, avg, sum, max, min, gt, lt, gte, lte}
 }
 
-var myDataType = (max_length=false,allowNull=false,name=null)=>{
-    var name = ()=>{
-        return 12
+var initDataType = ( name,Update=false,Delete=false,Width=false,Decimal_Places=false )=>{
+
+    function field(Null=null,defaultValue=null,primaryKey=false) {
+        var qNull = '';
+        var qDefaultValue = '';
+        var qWidth = '';
+        var qUpdate = '';
+        var qDelete = '';
+        var qDecimal_place = '';
+        var bracket = '';
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        if(Width){
+            width ? qWidth = `${width}` : qWidth = ''
+        }
+        if(Update){
+            onUpdate ? qUpdate = `ON UPDATE 'CASCADE'` : qUpdate = ''
+        }
+        if(Delete){
+            onDelete ? qDelete = `ON DELETE 'CASCADE'` : qDelete = ''
+        }
+        if(Decimal_Places){
+            decimal_places ? qDecimal_place = `,${decimal_places}` : qDecimal_place = ''
+        }
+
+        if(Decimal_Places){
+            bracket = `(${qDecimal_place})`
+        }else if(Decimal_Places && Width){
+            bracket = `(${qWidth}${qDecimal_place})`
+        } else {
+            bracket = `(${qWidth})`
+        }
+
+        return {value:`${name}${bracket} ${qDefaultValue} ${qUpdate} ${qDelete} ${qNull}`,primaryKey}
     }
-    return {name:name}
+    return {field}
 }
 
+class DataType{
+
+    constructor(){
+    }
+
+    qBigInt( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`BigInt${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qBit( Null=true,defaultValue=null,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`Bit${qwidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qSmallInt( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`SmallInt${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qDecimal( length=10,decimal_places=0,defaultValue=null,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Decimal(${length},${decimal_places}) ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qSmallMoney( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`SmallMoney ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qInt( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+        let output;
+        if(db_connection.db_name === 'sqlite3'){
+            output = {value:`Integer ${qDefaultValue} ${qNull}`,primaryKey}
+        } else {
+            output = {value:`Int${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+        }
+
+        return output
+    }
+
+    qTinyInt( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`TinyInt${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qMoney( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Money ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qFloat( length=10,decimal_places=0,defaultValue=null,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Float(${length},${decimal_places}) ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qDate( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Date ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qDatetime( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`DateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey}
+    }
+
+    qSmallDatetime( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`SmallDateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey}
+    }
+
+    qTime( Null=true,defaultValue=null,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Time ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qChar( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`Char${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qVarchar( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`Varchar${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qText( defaultValue=null,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Text ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qNChar( defaultValue=null,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`NChar ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qNVarchar( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`NVarchar${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qNText( Null=true,defaultValue=null,primaryKey=false ) {
+
+    }
+
+    qBinary( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`Binary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qVarBinary( defaultValue=null,Null=true,primaryKey=false,width=null ) {
+        var qNull;
+        var qDefaultValue;
+        var qWidth;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+        width ? qWidth = `(${width})` : qWidth = ''
+
+        return {value:`VarBinary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qImage( defaultValue=null,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Image ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+
+    qBoolean( defaultValue=false,Null=true,primaryKey=false ) {
+        var qNull;
+        var qDefaultValue;
+
+        Null ? qNull = '' : qNull = 'NOT NULL'
+        defaultValue ? qDefaultValue = `DEFAULT '${defaultValue}'` : qDefaultValue = ''
+
+        return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey}
+    }
+}
+
+
 /*
-SELECT customerName, customercity, customermail, salestotal
-FROM onlinecustomers AS oc
-   INNER JOIN
-   orders AS o
-   ON oc.customerid = o.customerid
-   ***WHERE CLAUSE COME IN***
-   INNER JOIN
-   sales AS s
-   ON o.orderId = s.orderId
-*/
-/*var main = [
+var main = [
   {
     favourite: 'red',
     id:1,
@@ -823,18 +1112,21 @@ var m = [
   },
   { favourite: 'red', id:1, male: false, name: null, love: 'yes', age: 19 }
 ]
-*/
 
-var e = {favourite:isIn(['red']),age:gte('10')}
-var myTable = new QuickTable('SOLI',{name:'Varchar(200)',age:'int'},extra=e)
-//myTable.insert({name:'ikechukwu',age:'10',favourite:'blue'});
+
+var datatype = new DataType()
+var e = {favourite:Operators().isIn(['blue']),male:true}
+var myTable = new QuickTable('MADZ',{name:datatype.qVarchar(),age:datatype.qInt()})
+myTable.insert({name:'ikechukwu',age:'10',favourite:'blue'});
 var c = (async()=>{
-    let response = await myTable.extract({name:'madzworld',...e},value='age,favourite,name',order='<age')
+    let response = await myTable.find({name:'ikechukwu',...e},val='age,name,favourite',order='<age')
     let appendData = myTable.append(response,{'love':[main,'age']})
     console.log(appendData)
 })()
+myTable.create()
+var t = initDataType('BigInt',Update=false,Delete=false,Width=true)
+var d = t.field(Null=true,defaultValue='soli',primaryKey=true,width=10,onUpdate=true)
+console.log(d.value)*/
 
-//myTable.updateRows({name:'solisoma',favourite:'red',age:10})
 
-//how to change value on runtime
-//append is based on id of the elements join them
+module.exports = {QuickTable,Operators:Operators(),DataType:new DataType(),initDataType}
