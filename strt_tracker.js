@@ -3,7 +3,8 @@
 let tables = {
                 Sol:{
                     columns:['name','age','favourite'],
-                    dataTypes:{ name: 'Varchar(200)', age: 'int', favourite: 'Varchar(200)'}
+                    dataTypes:{ name: 'Varchar(200)', age: 'int', favourite: 'Varchar(200)'},
+                    force:false
                 }
              }
 

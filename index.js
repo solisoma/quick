@@ -27,12 +27,7 @@ for pgsql it should be db_connection = connect('psql',{
                                                 maxUses://7500 optional
                                             })
 */
-let db_connection = engine.connect('psql',{
-                                                user:'postgres',
-                                                host:'localhost',
-                                                database:'postgres',
-                                                password:'ikechukwu',
-                                            })
+let db_connection = engine.connect('sqlite3','./db.sqlite3')
 
 //structures location i:e te path to all your structures
 
