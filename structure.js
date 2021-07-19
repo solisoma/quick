@@ -188,53 +188,40 @@ class QuickTable{
         var _d_list = Object.keys(this.db_instances)
         var __counter__ = parseInt(_d_list.length-1)
         var i = 0
-        var statement = `CREATE TABLE IF NOT EXISTS ${this.table_name}(`
+        let autoIncrease;
+        this.db_name === 'sqlite3' ? autoIncrease = `AUTOINCREMENT` : this.db_name === 'psql' ? autoIncrease = `SERIAL` : autoIncrease = `AUTO_INCREMENT`
+        var statement = `CREATE TABLE IF NOT EXISTS ${this.table_name}( id int NOT NULL ${autoIncrease},`
 
         if(this.force){
-            statement = `CREATE TABLE ${this.table_name}(`
+            statement = `CREATE TABLE ${this.table_name}(  id int NOT NULL ${autoIncrease}`
         }
+        let PrimaryKey = `PRIMARY KEY (id`
+        for(var n in this.db_instances){
+            if ( this.db_instances[n].primaryKey ){
+                PrimaryKey+=`,${n}`
+            }
+        }
+        PrimaryKey+= `)`
 
         if(this.extra !== null){
             for(var f in this.extra){
-                let __q__ = `${f.toString()} ${this.extra[f].value.toString()},`
+                let __q__ = `,${f.toString()} ${this.extra[f].value.toString()}`
                 statement += __q__
             }
             for(var f in this.db_instances){
-                let __r__;
-                if(_d_list.length == 1){
-                     __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
-                }else{
-                    if(i < __counter__){
-                         __r__ = `${f.toString()} ${this.db_instances[f].value.toString()},`;
-                    }else{
-                         __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
-                    }
-                }
-                i++
+                let  __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
                 statement += __r__
             }
-            statement += `)`
+            statement += `,${PrimaryKey} )`
         }else{
             for(var f in this.db_instances){
-                if(_d_list.length === 1){
-                    let __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
-                    statement += __r__
-                }else{
-                    let __r__ ;
-
-                    if(i < __counter__){
-                       __r__ = `${f.toString()} ${this.db_instances[f].value.toString()},`;
-                    }else{
-                       __r__ = `${f.toString()} ${this.db_instances[f].value.toString()}`;
-                    }
-                    i++
-                    statement+=__r__
-                }
+                let __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
+                statement += __r__
             }
-            statement += `)`
+            statement += `,${PrimaryKey} )`
         }
         console.log(statement)
-        if(this.db_name === 'sqlite3'){
+        /*if(this.db_name === 'sqlite3'){
             this.conn.run(statement,(err)=>{
                 if(err) throw err
             })
@@ -242,7 +229,7 @@ class QuickTable{
             this.conn.query(statement,(err)=>{
                 if(err) throw err
             })
-        }
+        }*/
     }
 
     //drop table if deleted from its structure's module
@@ -1025,11 +1012,19 @@ class DataType{
 
         return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey}
     }
+
+    qForeignKey( ){
+        return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey:'fk'}
+    }
+
+    qM2MKey( ){
+        return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey:'m2m'}
+    }
 }
 
 
 
-var main = [
+/*var main = [
   {
     favourite: 'red',
     id:1,
@@ -1116,17 +1111,17 @@ var m = [
 
 var datatype = new DataType()
 var e = {favourite:Operators().isIn(['blue']),male:true}
-var myTable = new QuickTable('MADZ',{name:datatype.qVarchar(),age:datatype.qInt()})
+var myTable = new QuickTable('MADZ',{name:datatype.qVarchar(defaultValue=null,Null=false,primaryKey=true,width=200 ),age:datatype.qInt()},extra=null,force=true)
 var myTable2 = new QuickTable('SOLI',{name:datatype.qVarchar(),age:datatype.qInt()})
 //myTable.insert({name:'ikechukwu',age:'10',favourite:'blue'});
-var c = (async()=>{
+/*var c = (async()=>{
     let response = await myTable.find({name:'ikechukwu',...e},val='age,name,favourite',order='<age')
     let response2 = await myTable2.find({name:'madzworld'},val='age')
     let appendData = myTable.append(response,{'love':[response2,'age']})
     console.log(appendData)
 })()
-/*myTable.create()
-var t = initDataType('BigInt',Update=false,Delete=false,Width=true)
+myTable.create()
+/*var t = initDataType('BigInt',Update=false,Delete=false,Width=true)
 var d = t.field(Null=true,defaultValue='soli',primaryKey=true,width=10,onUpdate=true)
 console.log(d.value)*/
 
