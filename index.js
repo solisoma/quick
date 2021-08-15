@@ -1,5 +1,5 @@
 //contains your db connection
-const engine = require('./control/engine.js')
+const {connect} = require('./control/engine.js')
 
 //db connection instance
 
@@ -27,10 +27,18 @@ for pgsql it should be db_connection = connect('psql',{
                                                 maxUses://7500 optional
                                             })
 */
-let db_connection = engine.connect('sqlite3','./db.sqlite3')
+let db_connection = connect('psql',{
+                                                user:'postgres',
+                                                host:'localhost',
+                                                database:'postgres',
+                                                password:'ikechukwu',
+                                            })
 
 //structures location i:e te path to all your structures
 
 let structure_locations = ['./structure']
 
-module.exports = {db_connection:db_connection,structure_locations:structure_locations }
+//app name
+const app_name = 'xatisfy'
+
+module.exports = {db_connection:db_connection,structure_locations:structure_locations, app_name }
