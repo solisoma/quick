@@ -408,11 +408,9 @@ class QuickTable{
                         var m2mTable = `${this.app_name}_${this.table_name}__${this.app_name}_${this.extra[f].motherTable}`
                         m2mList.push([`${this.app_name}_${this.extra[f].motherTable}`,m2mTable])
                     }
-
                     if ( this.extra[f].primaryKey ){
                         statement += `,CONSTRAINT ${this.app_name}_${this.table_name}__${f} PRIMARY KEY(${f})`
                     }
-
                     let __q__ = `,${f.toString()} ${this.extra[f].value.toString()}`
                     statement += __q__
                 }
@@ -422,11 +420,9 @@ class QuickTable{
                         var m2mTable = `${this.app_name}_${this.table_name}__${this.app_name}_${this.db_instances[f].motherTable}`
                         m2mList.push([`${this.app_name}_${this.db_instances[f].motherTable}`,m2mTable])
                     }
-
                     if ( this.db_instances[f].primaryKey ){
                         statement += `,CONSTRAINT ${this.app_name}_${this.table_name}__${f} PRIMARY KEY(${f})`
                     }
-
                     let  __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
                     statement += __r__
                 }
@@ -478,7 +474,6 @@ class QuickTable{
         var instances  = this.db_instances
        /* var e = this.extra
         var db_i = this.db_instances
-
         if(this.extra){
             instances = {db_i,...e}
         }*/
@@ -701,7 +696,6 @@ class QuickTable{
                 var instances  = this.db_instances
                 /*var e = this.extra
                 var db_i = this.db_instances
-
                 if(this.extra){
                     instances = {db_i,...e}
                 }*/
@@ -764,7 +758,6 @@ class QuickTable{
                     var instances  = this.db_instances
                     /*var e = this.extra
                     var db_i = this.db_instances
-
                     if(this.extra){
                         instances = {db_i,...e}
                     }*/
@@ -917,7 +910,6 @@ class QuickTable{
                 var instances  = this.db_instances
                 /*var e = this.extra
                 var db_i = this.db_instances
-
                 if(this.extra){
                     instances = {db_i,...e}
                 }*/
@@ -988,7 +980,6 @@ class QuickTable{
                     var instances  = this.db_instances
                     /*var e = this.extra
                     var db_i = this.db_instances
-
                     if(this.extra){
                         instances = {db_i,...e}
                     }*/
@@ -1030,7 +1021,6 @@ class QuickTable{
                                 m2mQueryReturn.map(items=>{
                                     if( itm.id === items.id_main_table ) {
                                         itm[n].push(items.id_referenced_table)
-
                                     }
                                 })
                             })*/
@@ -1092,7 +1082,6 @@ class QuickTable{
             var instances  = this.db_instances
             /*var e = this.extra
             var db_i = this.db_instances
-
             if(this.extra){
                 instances = {db_i,...e}
             }*/
@@ -1141,7 +1130,6 @@ class QuickTable{
                         m2mQueryReturn.map(items=>{
                             if( itm.id === items.id_main_table ) {
                                 itm[n].push(items.id_referenced_table)
-
                             }
                         })
                     })*/
@@ -1354,10 +1342,6 @@ class QuickTable{
         return main_query
     }
 
-    m2mD(values,force){
-
-    }
-
     m2mA(id,values){
         let {table} = this.knowTable(values[0])
         values[1].map(a=>{
@@ -1442,6 +1426,27 @@ class QuickTable{
             var response = await Table.extract(Query,QuerySupplement)
             //console.log(response)
             return response
+        })()
+        return output
+    }
+
+    rawHTML(arg){
+        var output = (async()=>{
+            var returnee = 'Command successful';
+            if(arg.statementType === 'fetch'){
+                this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement) : returnee = await getQueryB(arg.statement)
+            } else if(arg.statementType === 'command'){
+                if(this.db_name === 'sqlite3'){
+                    this.conn.run(arg.statement,(err)=>{
+                        if(err) returnee = 'Command not successful'; throw err
+                    })
+                }else{
+                    this.conn.query(arg.statement,(err)=>{
+                        if(err) returnee = 'Command not successful'; throw err
+                    })
+                }
+            }
+            return returnee
         })()
         return output
     }
@@ -2023,7 +2028,9 @@ var c = (async()=>{
             }
         }
     })
+    var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_Capacity`,statementType:'fetch'})
     console.log(s[0].soli)
+    console.log(d)
 })()
 //myTable2.create()
 //myTable.create()
