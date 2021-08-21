@@ -1,4 +1,3 @@
-//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
-const DeployedFileList = []
+const DeployedFileList = ["01migration.js","00migration.js"]
 
 module.exports = {DeployedFileList}

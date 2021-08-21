@@ -123,7 +123,7 @@ const CommandsI = {
 }
 
 if(JSON.stringify(Command) === JSON.stringify(CommandsI)){
-    console.log("No changes yet")
+    console.log("No changes yet\n")
 } else {
         var regExp = /\d+/igm
         if(FILE.length == 0){
@@ -161,6 +161,6 @@ module.exports = {tables:tables}`
             )*/
         }
 
-        console.log('\nCommand completed successfully')
+        console.log('\nCommand completed successfully\n')
 
 }

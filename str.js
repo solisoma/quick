@@ -2100,4 +2100,4 @@ var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width
 console.log(d)*/
 
 //module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
-module.exports = {Table,Table2}
+module.exports = {Table,Table2,Table3}

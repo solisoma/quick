@@ -1472,6 +1472,11 @@ class QuickTable{
         })()
         return output
     }
+    AddColumn(){}
+
+    UpdateColumn(){}
+
+    DropColumn(){}
 }
 
 
