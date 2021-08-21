@@ -1,7 +1,7 @@
 //contains both the fields and function to create tables
 
-let {db_connection,app_name} = require('./index.js')
-let {tables} = require('./strt_tracker.js')
+let {db_connection,app_name} = require(`${process.cwd()}/QT_FOLDER/settings.js`)
+let {tables} = require(`${process.cwd()}/QT_FOLDER/structure_tracker.js`)
 
 //methods of table = define, drop, find, extract, append, val, order, collect, insert
 var getQueryA = async(a,b)=>{
@@ -195,8 +195,9 @@ class QuickTable{
         this.conn = db_connection.connector
         this.db_name = db_connection.db_name
         this.app_name = app_name
-        this.tables = tables
+        this.tables = tables[`${app_name}_${table_name}`]
         this.table_name = table_name
+        this.table_fullname = `${app_name}_${table_name}`
         this.db_instances = db_instances
         //this.extra = extra
         this.force = force
@@ -253,7 +254,7 @@ class QuickTable{
     }
 
     parseFunc(func){
-        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\'\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let check = func.match(RegExp)
 
         let result;
@@ -268,9 +269,9 @@ class QuickTable{
     }
 
     parseFuncVal(val,fin){
-        let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+(\_{1})/igm
-        let conAndNotRegExp = /([A-Za-z0-9\.\:\(\)\;\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+)(\__{1})/igm
-        let conOrNotRegExp = /([A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\"\s]+)(\___{1})/igm
+        let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\'\s]+(\_{1})/igm
+        let conAndNotRegExp = /([A-Za-z0-9\.\:\(\)\;\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\'\s]+)(\__{1})/igm
+        let conOrNotRegExp = /([A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\'\s]+)(\___{1})/igm
 
         let checkOr = val.match(conOrRegExp)
         let checkAndNot = val.match(conAndNotRegExp)
@@ -317,7 +318,7 @@ class QuickTable{
     }
 
     parseAll(val,fin){
-        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\"\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
+        let RegExp = /\<\{[A-Za-z0-9\.\(\)\'\<\>\=\'\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+\}\>/igm
         let result;
         val = val.toString()
         if (val !== true && val !== false){
@@ -355,7 +356,7 @@ class QuickTable{
         }*/
         var output = columns__[n].motherTable
 
-        return {table:`${this.app_name}_${this.table_name}__${this.app_name}_${output}`,motherTable:`${this.app_name}_${output}`}
+        return {table:`${this.table_fullname}__${this.app_name}_${output}`,motherTable:`${this.app_name}_${output}`}
     }
 
     createM2MTable(motherTable,m2mTable){
@@ -365,8 +366,8 @@ class QuickTable{
             id_main_table ${int},
             id_referenced_table ${int},
             deleted Boolean DEFAULT false,
-            CONSTRAINT FK_${this.app_name}__${this.table_name}_${motherTable} FOREIGN KEY (id_main_table) REFERENCES ${this.app_name}_${this.table_name}(id) ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT FK_${motherTable}__${this.app_name}_${this.table_name} FOREIGN KEY (id_referenced_table) REFERENCES ${motherTable}(id)
+            CONSTRAINT FK_${this.table_fullname}__${motherTable} FOREIGN KEY (id_main_table) REFERENCES ${this.table_fullname}(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT FK_${motherTable}__${this.table_fullname} FOREIGN KEY (id_referenced_table) REFERENCES ${motherTable}(id)
             ON DELETE CASCADE ON UPDATE CASCADE
          )`
          console.log(create_table)
@@ -391,25 +392,26 @@ class QuickTable{
             let int;
             let queryIt;
             this.db_name === 'sqlite3' ? autoIncrease = `AUTOINCREMENT` : this.db_name === 'psql' ? autoIncrease = `SERIAL` : autoIncrease = `AUTO_INCREMENT`
-            this.db_name === 'sqlite3' ? int = `INTEGER` : int = `Int`
+            this.db_name === 'sqlite3' ? int = `Integer PRIMARY KEY` : int = `Int PRIMARY KEY`
             this.db_name === 'psql' ? queryIt = `id ${autoIncrease}` : queryIt = `id ${int} ${autoIncrease}`
-            var statement = `CREATE TABLE IF NOT EXISTS ${this.app_name}_${this.table_name}(${queryIt},CONSTRAINT ${this.app_name}_${this.table_name}__id PRIMARY KEY(id)`
+            var statement = `CREATE TABLE IF NOT EXISTS ${this.table_fullname}(${queryIt}`
 
             if(this.force){
-                statement = `CREATE TABLE ${this.app_name}_${this.table_name}(${queryIt},CONSTRAINT ${this.app_name}_${this.table_name}__id PRIMARY KEY(id)`
+                statement = `CREATE TABLE ${this.table_fullname}(${queryIt}`
             }
 
             let m2mList = []
+            let constraints = ''
 
             /*if(this.extra !== null){
                 for(var f in this.extra){
                     if(this.extra[f].motherTable){
                         //init table
-                        var m2mTable = `${this.app_name}_${this.table_name}__${this.app_name}_${this.extra[f].motherTable}`
+                        var m2mTable = `${this.table_fullname}__${this.app_name}_${this.extra[f].motherTable}`
                         m2mList.push([`${this.app_name}_${this.extra[f].motherTable}`,m2mTable])
                     }
                     if ( this.extra[f].primaryKey ){
-                        statement += `,CONSTRAINT ${this.app_name}_${this.table_name}__${f} PRIMARY KEY(${f})`
+                        statement += `,CONSTRAINT ${this.table_fullname}__${f} PRIMARY KEY(${f})`
                     }
                     let __q__ = `,${f.toString()} ${this.extra[f].value.toString()}`
                     statement += __q__
@@ -417,11 +419,11 @@ class QuickTable{
                 for(var f in this.db_instances){
                     if(this.db_instances[f].motherTable){
                         //init table
-                        var m2mTable = `${this.app_name}_${this.table_name}__${this.app_name}_${this.db_instances[f].motherTable}`
+                        var m2mTable = `${this.table_fullname}__${this.app_name}_${this.db_instances[f].motherTable}`
                         m2mList.push([`${this.app_name}_${this.db_instances[f].motherTable}`,m2mTable])
                     }
                     if ( this.db_instances[f].primaryKey ){
-                        statement += `,CONSTRAINT ${this.app_name}_${this.table_name}__${f} PRIMARY KEY(${f})`
+                        statement += `,CONSTRAINT ${this.table_fullname}__${f} PRIMARY KEY(${f})`
                     }
                     let  __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
                     statement += __r__
@@ -431,23 +433,21 @@ class QuickTable{
             for(var f in this.db_instances){
                 if(this.db_instances[f].motherTable){
                     //init table
-                    var m2mTable = `${this.app_name}_${this.table_name}__${this.app_name}_${this.db_instances[f].motherTable}`
+                    var m2mTable = `${this.table_fullname}__${this.app_name}_${this.db_instances[f].motherTable}`
                     m2mList.push([`${this.app_name}_${this.db_instances[f].motherTable}`,m2mTable])
                 }
-
+                let __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
+                statement += __r__
                 if ( this.db_instances[f].primaryKey ){
-                    statement += `,CONSTRAINT ${this.app_name}_${this.table_name}__${f} PRIMARY KEY(${f})`
+                    constraints += `,CONSTRAINT ${this.table_fullname}__${f} PRIMARY KEY(${f})`
                 }
 
                 if ( this.db_instances[f].referencedTable ){
                     var {referencedTable} = this.db_instances[f]
-                    statement += `,CONSTRAINT FK_${this.app_name}_${this.table_name}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id)
-                                    ON DELETE CASCADE ON UPDATE CASCADE`
+                    constraints += `,CONSTRAINT FK_${this.table_fullname}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
                 }
-                console.log(f)
-                let __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
-                statement += __r__
             }
+            statement+=constraints
             statement+=`)`
             //}
 
@@ -484,7 +484,7 @@ class QuickTable{
                 droppingTable.push(table)
             }
         }
-        droppingTable.push(`${this.app_name}_${this.table_name}`)
+        droppingTable.push(`${this.table_fullname}`)
         droppingTable.map(a=>{
             var q =`DROP TABLE IF EXISTS ${a}`
             if(this.db_name === 'sqlite3'){
@@ -516,7 +516,7 @@ class QuickTable{
                         let QueryReturn = await getQueryA(qq,true)
                         if (QueryReturn === undefined ) {
                             this.conn.run(q,(err)=>{
-                                if(err) throw `cannot not be inserted into "${n}" column because the mother table ${motherTable} or the main table ${this.app_name}_${this.table_name} with such id does not exist`//err
+                                if(err) throw `cannot not be inserted into '${n}' column because the mother table ${motherTable} or the main table ${this.table_fullname} with such id does not exist`//err
                             })
                         }
                     })()
@@ -525,7 +525,7 @@ class QuickTable{
                         let QueryReturn = await getQueryB(qq,true)
                         if (QueryReturn === undefined ) {
                             this.conn.query(q,(err)=>{
-                                if(err) throw `cannot not be inserted into "${n}" column because the mother table ${motherTable} or the main table ${this.app_name}_${this.table_name} with such id does not exist`//err
+                                if(err) throw `cannot not be inserted into '${n}' column because the mother table ${motherTable} or the main table ${this.table_fullname} with such id does not exist`//err
                             })
                         }
                     })()
@@ -540,7 +540,7 @@ class QuickTable{
         let _i_i_ = 0
         let _i_counter__ = parseInt(Object.keys(_values).length-1)
 
-        let __columns__ = `INSERT INTO ${this.app_name}_${this.table_name}(`
+        let __columns__ = `INSERT INTO ${this.table_fullname}(`
         let __values__ = '('
         let _v_length = Object.keys(_values).length
         let m2mList = []
@@ -550,6 +550,10 @@ class QuickTable{
                     let insert_values = {}
                     insert_values[f] = _values[f]
                     m2mList.push(insert_values)
+            } else if(this.db_instances[f].JSON){
+                __columns__+= `${f}`;
+                var stringValue = JSON.stringify(_values[f])
+                __values__+="'"+stringValue+"'";
             } else {
                 if(_v_length == 1){
                     __columns__+= `${f}`;
@@ -575,7 +579,7 @@ class QuickTable{
         if(this.db_name === 'sqlite3'){
             this.conn.run(statement,(err)=>{
                 if(err) throw err
-                m2mList.map(i=>this.insertM2MTable(i)) //console.log(`values inserted into table ${this.app_name}_${this.table_name}`)
+                m2mList.map(i=>this.insertM2MTable(i)) //console.log(`values inserted into table ${this.table_fullname}`)
             })
         }else{
             this.conn.query(statement,(err,res)=>{
@@ -586,7 +590,7 @@ class QuickTable{
     }
 
     updateRows( __values_ ) {
-        var q = `UPDATE ${this.app_name}_${this.table_name} SET`
+        var q = `UPDATE ${this.table_fullname} SET`
         var count = 0
         for(var i in __values_){
             var add = ` ${i}='${__values_[i]}'`
@@ -642,7 +646,7 @@ class QuickTable{
 
             let select;
             if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
-            let q = `${select} ${columns_} FROM ${this.app_name}_${this.table_name} `
+            let q = `${select} ${columns_} FROM ${this.table_fullname} `
             let where_clause = '';
             let _index = Object.keys(query).length
             let __counter_ = _index - 1
@@ -701,8 +705,10 @@ class QuickTable{
                 }*/
 
                 for(var n in instances){
-                    if(instances[n].motherTable){
+                    if(instances[n].motherTable ){
                         response[n] = JSON.parse(response[n])
+                    } else if(instances[n].JSON){
+                        response[n] = JSON.parse(JSON.parse(response[n]))
                     }
                 }
                 if (m2mList.length !== 0) {
@@ -812,92 +818,97 @@ class QuickTable{
         var order=null; if(otherQuery.order) order = otherQuery.order;
         var group=null; if(otherQuery.group) group = otherQuery.group;
         var distinct=false; if(otherQuery){if(otherQuery.distinct) distinct = otherQuery.distinct;};
+        var q;
+        var m2mList = []
         let output = (async()=>{
-            let columns_ = `*`
-            let order_ = ``
-            let group_ = ``
-            if(val){ columns_ = val }
-            if(order){
-                var direction;
-                var regExp = /\>/igm;
-                direction = order.match(regExp)
-                if(!direction){
-                    var regExp2 = /\</igm;
-                    var value = order.replace(regExp2,'');
-                    order_ = ` ORDER BY ${value} ASC`
-                } else {
-                    var value = order.replace(regExp,'');
-                    order_ = ` ORDER BY ${value} DESC`
-                }
-            }
-
-            if(group){
-                group_ = ` GROUP BY ${group}`
-            }
-
-            let select;
-            if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
-            let q = `${select} ${columns_} FROM ${this.app_name}_${this.table_name} `
-            let where_clause = ''
-            let _index = Object.keys(query).length
-            let __counter_ = _index - 1
-            var m2mList = []
-            let z = 0
-            var __ = Operators()
-            for(var i in query){
-                if(query[i].m2m){
-                    let insert_values = {}
-                    insert_values[i] = query[i]
-                    m2mList.push(insert_values)
-                } else {
-                    if(_index == 1){
-                        let __add__;
-                        if(Array.isArray(query[i])){
-                            var parseArg = __.isIn(query[i][0],query[i][1])
-                            __add__ = `${i}${this.parseAll(parseArg,'final')}`
-                        } else {
-                            if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
-                                __add__ = `${i} IS NULL`
-                            } else {
-                                __add__ = `${i}${this.parseAll(query[i],'final')}`
-                            }
-                        }
-                        where_clause+= __add__
+            if(otherQuery.statementGiven){
+                q = query
+            } else {
+                let columns_ = `*`
+                let order_ = ``
+                let group_ = ``
+                if(val){ columns_ = val }
+                if(order){
+                    var direction;
+                    var regExp = /\>/igm;
+                    direction = order.match(regExp)
+                    if(!direction){
+                        var regExp2 = /\</igm;
+                        var value = order.replace(regExp2,'');
+                        order_ = ` ORDER BY ${value} ASC`
                     } else {
-                        let __add__;
-                        if(z < __counter_){
-                            if(Array.isArray(query[i])){
-                                var parseArg = __.isIn(query[i][0],query[i][1])
-                                __add__ = `${i}${this.parseAll(parseArg)}`
-                            } else {
-                                if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
-                                    __add__ = `${i} IS NULL`
-                                } else {
-                                    __add__ = `${i}${this.parseAll(query[i])}`
-                                }
-                            }
-                            where_clause+= __add__
-                        } else {
+                        var value = order.replace(regExp,'');
+                        order_ = ` ORDER BY ${value} DESC`
+                    }
+                }
+
+                if(group){
+                    group_ = ` GROUP BY ${group}`
+                }
+
+                let select;
+                if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
+                q = `${select} ${columns_} FROM ${this.table_fullname} `
+                let where_clause = ''
+                let _index = Object.keys(query).length
+                let __counter_ = _index - 1
+                let z = 0
+                var __ = Operators()
+                for(var i in query){
+                    if(query[i].m2m){
+                        let insert_values = {}
+                        insert_values[i] = query[i]
+                        m2mList.push(insert_values)
+                    } else {
+                        if(_index == 1){
+                            let __add__;
                             if(Array.isArray(query[i])){
                                 var parseArg = __.isIn(query[i][0],query[i][1])
                                 __add__ = `${i}${this.parseAll(parseArg,'final')}`
                             } else {
-                                if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___' && query[i] !== false){
+                                if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
                                     __add__ = `${i} IS NULL`
                                 } else {
                                     __add__ = `${i}${this.parseAll(query[i],'final')}`
                                 }
                             }
                             where_clause+= __add__
+                        } else {
+                            let __add__;
+                            if(z < __counter_){
+                                if(Array.isArray(query[i])){
+                                    var parseArg = __.isIn(query[i][0],query[i][1])
+                                    __add__ = `${i}${this.parseAll(parseArg)}`
+                                } else {
+                                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___'){
+                                        __add__ = `${i} IS NULL`
+                                    } else {
+                                        __add__ = `${i}${this.parseAll(query[i])}`
+                                    }
+                                }
+                                where_clause+= __add__
+                            } else {
+                                if(Array.isArray(query[i])){
+                                    var parseArg = __.isIn(query[i][0],query[i][1])
+                                    __add__ = `${i}${this.parseAll(parseArg,'final')}`
+                                } else {
+                                    if(query[i] === null || query[i] == '_' || query[i] == '__' || query[i] == '___' && query[i] !== false){
+                                        __add__ = `${i} IS NULL`
+                                    } else {
+                                        __add__ = `${i}${this.parseAll(query[i],'final')}`
+                                    }
+                                }
+                                where_clause+= __add__
+                            }
                         }
                     }
+                    z++
                 }
-                z++
+                if(where_clause) q+=`WHERE ${where_clause} `;
+                q+=group_
+                q+=order_
+                console.log(q)
             }
-            if(where_clause) q+=`WHERE ${where_clause} `;
-            q+=group_
-            q+=order_
-            console.log(q)
             let response;
             let itemToRemove = []
             try{
@@ -915,12 +926,13 @@ class QuickTable{
                 }*/
 
                 for(var n in instances){
-                    if(instances[n].motherTable){
+                    if(instances[n].motherTable || instances[n].JSON){
                         response.map(itm=>{
                             itm[n] = JSON.parse(itm[n])
                         })
                     }
                 }
+
                 if(m2mList.length !== 0){
                     var m2mSearch = '';
                     //var a = m2mList.map(async(i,j)=>{
@@ -1069,7 +1081,7 @@ class QuickTable{
             }
             let select;
             if(distinct){ select = `SELECT DISTINCT` } else { select = `SELECT` }
-            let a = `${select} ${columns_} FROM ${this.app_name}_${this.table_name}`
+            let a = `${select} ${columns_} FROM ${this.table_fullname}`
             a+=group_
             a+=order_
             let response;
@@ -1078,7 +1090,6 @@ class QuickTable{
             } catch(e) {
                 console.log(`An error occurred:${e}`)
             }
-
             var instances  = this.db_instances
             /*var e = this.extra
             var db_i = this.db_instances
@@ -1087,7 +1098,7 @@ class QuickTable{
             }*/
 
             for(var n in instances){
-                if(instances[n].motherTable){
+                if(instances[n].motherTable || instances[n].JSON){
                     response.map(itm=>{
                         itm[n] = JSON.parse(itm[n])
                     })
@@ -1135,10 +1146,8 @@ class QuickTable{
                     })*/
                 }
             }
-
             return response
         })()
-
         return output
     }
 
@@ -1162,8 +1171,8 @@ class QuickTable{
         Object.keys(this.db_instances).map((itm)=>{
             columns.push(itm)
         })
-        let tables = {table_name:`${this.app_name}_${this.table_name}`,columns,dataTypes,force:this.force}
-        console.log(tables)
+        let tables = {table_name:`${this.table_fullname}`,columns,dataTypes,force:this.force,recentTable:this.tables}
+        //console.log(tables)
         return tables
     }
 
@@ -1412,7 +1421,7 @@ class QuickTable{
             var {Query} = arg
             var {QuerySupplement} = arg
             var pointer = a.id
-            var table = `${this.app_name}_${Table.table_name}__${this.app_name}_${this.table_name}`
+            var table = `${this.app_name}_${Table.table_name}__${this.table_fullname}`
             var qq = `SELECT * FROM ${table} WHERE id_referenced_table='${pointer}'`
             var returnedQuery;
             this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq) : returnedQuery = await getQueryB(qq)
@@ -1433,8 +1442,21 @@ class QuickTable{
     rawHTML(arg){
         var output = (async()=>{
             var returnee = 'Command successful';
-            if(arg.statementType === 'fetch'){
-                this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement) : returnee = await getQueryB(arg.statement)
+            if(arg.statementType === 'fetchAll'){
+                if(arg.M2M || arg.JSON){
+                    //await this.find({id:1})
+                    var query = await this.all()
+                    returnee = query
+                } else {
+                    this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement) : returnee = await getQueryB(arg.statement)
+                }
+            } else if(arg.statementType === 'fetchWhere'){
+                if(arg.M2M || arg.JSON){
+                    var query = await this.extract(arg.statement,{statementGiven:true})
+                    returnee = query
+                } else {
+                    this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement) : returnee = await getQueryB(arg.statement)
+                }
             } else if(arg.statementType === 'command'){
                 if(this.db_name === 'sqlite3'){
                     this.conn.run(arg.statement,(err)=>{
@@ -1539,7 +1561,13 @@ class DataType{
     }
 
     qJson(arg) {
-        return {value:this.qVarchar({width:l}),json:through}
+        var length;
+        if(!arg || !arg.length){
+            length=100;
+        } else {
+            length = arg.length
+        }
+        return {value:this.qVarchar({width:length}).value,JSON:true}
     }
 
     qSmallInt( arg ) {
@@ -2000,24 +2028,24 @@ var __ = new DataType()
 var e = {favourite:Operators().isIn(['blue']),male:true}
 var myTable2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),age:__.qInt()})
 var myTable = new QuickTable('MADZ',{name:__.qVarchar({Null:false,unique:true,width:100}),soli:__.qM2MKey('SOLI'),age:__.qInt()})
-var myTable3 = new QuickTable('Capacity', {age:__.qInt(),height:__.qInt(),muscleSize:__.qVarchar({width:10}), madz:__.qForeignKey('SOLI')})
+var myTable3 = new QuickTable('Capacity', {ike:__.qJson(),height:__.qInt(),muscleSize:__.qVarchar({width:10,primaryKey:true}), madz:__.qForeignKey('SOLI'),age:__.qInt()})
 //myTable.insert({name:'cs',soli:Operators().m2mI([2],['id',2]),age:'20'});
 //myTable2.insert({name:'ie',age:'20'});
-//myTable3.insert({muscleSize:'very big',madz:4,height:22,age:25})
-var c = (async()=>{
+//myTable3.insert({muscleSize:'big',madz:4,height:22,age:20,ike:[3,4,5]})
+/*var c = (async()=>{
     let response2 = await myTable.extract({id:[[2,4]]},{m2mValue:{soli:'*'}})
     //let key = response2[response2.length-1].id+1
     //myTable.insert({name:'nw',soli:Operators().m2mI([2],['id',key]),age:'20'});
     //myTable2.insert({name:'ike',age:'20'});
     let response = await myTable2.find({id:1})
-    let response3 = await myTable3.extract({id:[[3,4]]})
-    //let appendData = myTable.append(response3,{love:m/*,passion:response*/},{love:{Join:'leftJoin'}/*,passion:{Joiner:['id','madz'],Join:'innerJoin'}*/})
+    let response3 = await myTable3.all()
+    //let appendData = myTable.append(response3,{love:m,passion:response},{love:{Join:'leftJoin'},passion:{Joiner:['id','madz'],Join:'innerJoin'}})
     //myTable.m2mA(response2[0].id,['soli',[2]])
     //myTable.m2mD(response2[0].id,['soli',[2]])
     //console.log(response2[0])
     //console.log(response)
     //console.log(response3)
-    var s = await myTable2.getM2MChild(response,{
+    /*var s = await myTable2.getM2MChild(response,{
         Table:myTable,
         Query:{
             name:'nwa'
@@ -2028,15 +2056,16 @@ var c = (async()=>{
             }
         }
     })
-    var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_Capacity`,statementType:'fetch'})
-    console.log(s[0].soli)
+    var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_MADZ`,statementType:'fetchWhere',JSON:true})
+    //console.log(s[0].soli)
     console.log(d)
-})()
+})()*/
 //myTable2.create()
 //myTable.create()
-//myTable3.create()
+//myTable3.create)
 /*var t = initDataType({name:'MADZWORLD',Width:true,Update:true,Delete:true,DefaultValue:true, Decimal_Places:true})
 var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width:10,primaryKey:false, decimal_places:10})
 console.log(d)*/
 
-module.exports = {QuickTable,Operators:Operators(),DataType:new DataType(),initDataType}
+//module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
+module.exports = {myTable,myTable2,myTable3}
