@@ -32,10 +32,10 @@ let db_connection = connect('psql',{
                                 user:'postgres',
                                 host:'localhost',
                                 database:'postgres',
-                                password:'ikechukwu',
+                                password:'qt',
                             })
 let app_name = 'xatisfy'
-let structures = ['/structure.js']
+let structures = ['./structure.js']
 //structures location i:e te path to all your structures
 
 module.exports = {db_connection,app_name,structures}

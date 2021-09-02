@@ -1498,8 +1498,6 @@ class QuickTable{
                 })
             },1000)
         }
-
-
         var handleOthers = async (err)=>{
             if(err) throw err;
             var tableFullname = await this.create(`${this.table_fullname}_proto_`)
@@ -1507,7 +1505,6 @@ class QuickTable{
             setTimeout(async()=>{
                 var query_proto_ = `INSERT INTO ${tableFullname} (${columns_proto_}) SELECT ${columns_proto_} FROM ${this.table_fullname}_old`
                 console.log(query_proto_)
-
                 if(this.db_name === 'sqlite3'){
                     await this.conn.run(query_proto_,async(err)=>{
                         if(err) throw err;
@@ -1521,7 +1518,6 @@ class QuickTable{
                 }
             },1000)
         }
-
         if(this.db_name === 'sqlite3'){
             this.conn.run(query,handleOthers)
         }else if(this.db_name === ('psql'||'mysql')){
@@ -2406,5 +2402,5 @@ var __ = new DataType()
 var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width:10,primaryKey:false, decimal_places:10})
 console.log(d)*/
 
-//module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
-module.exports = {myTable2,myTable,myTable3}
+module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
+//module.exports = {myTable2,myTable,myTable3}
