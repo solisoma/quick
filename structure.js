@@ -2353,7 +2353,7 @@ class DataType{
     }
 }
 
-var __ = new DataType()
+//var __ = new DataType()
 //var e = {favourite:Operators().isIn(['blue']),male:true}
 //var myTable2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),age:__.qInt()})
 //var myTable4 = new QuickTable('MADZ_old',{name:__.qVarchar({width:100}),age:__.qInt()})
