@@ -359,47 +359,15 @@ class QuickTable{
         return {table:`${this.table_fullname}__${this.app_name}_${output}`,motherTable:`${this.app_name}_${output}`}
     }
 
-    drop(){
-        var droppingTable = []
-
-        var instances  = this.db_instances
-       /* var e = this.extra
-        var db_i = this.db_instances
-        if(this.extra){
-            instances = {db_i,...e}
-        }*/
-
-        for(var n in instances){
-            if(instances[n].motherTable){
-                let {table} = this.knowTable(n)
-                droppingTable.push(table)
-            }
-        }
-        droppingTable.push(`${this.table_fullname}`)
-        droppingTable.map(a=>{
-            var q =`DROP TABLE IF EXISTS ${a}`
-            if(this.db_name === 'sqlite3'){
-                this.conn.run(q,(err)=>{
-                    if(err) throw err;
-                })
-            }else{
-                this.conn.query(q,(err,res)=>{
-                    if(err) throw err
-                    console.log(`${this.table_name} dropped`)
-                })
-            }
-        })
-    }
-
-    createM2MTable(motherTable,m2mTable){
+    createM2MTable(motherTable,m2mTable,a){
         //check if mother exist
         var int = this.db_name == 'sqlite3' ? 'INTEGER' : 'Int'
         var create_table = `CREATE TABLE IF NOT EXISTS ${m2mTable}(
             id_main_table ${int},
             id_referenced_table ${int},
             deleted Boolean DEFAULT false,
-            CONSTRAINT FK_${this.table_fullname}__${motherTable} FOREIGN KEY (id_main_table) REFERENCES ${this.table_fullname}(id) ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT FK_${motherTable}__${this.table_fullname} FOREIGN KEY (id_referenced_table) REFERENCES ${motherTable}(id)
+            CONSTRAINT FK_${a}__${motherTable} FOREIGN KEY (id_main_table) REFERENCES ${a}(id) ON DELETE CASCADE ON UPDATE CASCADE,
+            CONSTRAINT FK_${motherTable}__${a} FOREIGN KEY (id_referenced_table) REFERENCES ${motherTable}(id)
             ON DELETE CASCADE ON UPDATE CASCADE
          )`
          console.log(create_table)
@@ -415,8 +383,10 @@ class QuickTable{
         }
     }
 
-    create(){
-        (async()=>{
+    create(a){
+        var output = (async()=>{
+            var tableFullname;
+           a ? tableFullname = a : tableFullname = this.table_fullname
             var _d_list = Object.keys(this.db_instances)
             var __counter__ = parseInt(_d_list.length-1)
             var i = 0
@@ -426,10 +396,11 @@ class QuickTable{
             this.db_name === 'sqlite3' ? autoIncrease = `AUTOINCREMENT` : this.db_name === 'psql' ? autoIncrease = `SERIAL` : autoIncrease = `AUTO_INCREMENT`
             this.db_name === 'sqlite3' ? int = `Integer PRIMARY KEY` : int = `Int PRIMARY KEY`
             this.db_name === 'psql' ? queryIt = `id ${autoIncrease}` : queryIt = `id ${int} ${autoIncrease}`
-            var statement = `CREATE TABLE IF NOT EXISTS ${this.table_fullname}(${queryIt}`
+            var statement = `CREATE TABLE IF NOT EXISTS ${tableFullname}(${queryIt}`
+
             if(this.force){
                 this.drop()
-                statement = `CREATE TABLE ${this.table_fullname}(${queryIt}`
+                statement = `CREATE TABLE ${tableFullname}(${queryIt}`
             }
 
             let m2mList = []
@@ -465,18 +436,18 @@ class QuickTable{
             for(var f in this.db_instances){
                 if(this.db_instances[f].motherTable){
                     //init table
-                    var m2mTable = `${this.table_fullname}__${this.app_name}_${this.db_instances[f].motherTable}`
+                    var m2mTable = `${tableFullname}__${this.app_name}_${this.db_instances[f].motherTable}`
                     m2mList.push([`${this.app_name}_${this.db_instances[f].motherTable}`,m2mTable])
                 }
                 let __r__ = `,${f.toString()} ${this.db_instances[f].value.toString()}`;
                 statement += __r__
                 if ( this.db_instances[f].primaryKey ){
-                    constraints += `,CONSTRAINT ${this.table_fullname}__${f} PRIMARY KEY(${f})`
+                    constraints += `,CONSTRAINT ${tableFullname}__${f} PRIMARY KEY(${f})`
                 }
 
                 if ( this.db_instances[f].referencedTable ){
                     var {referencedTable} = this.db_instances[f]
-                    constraints += `,CONSTRAINT FK_${this.table_fullname}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
+                    constraints += `,CONSTRAINT FK_${tableFullname}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
                 }
             }
             statement+=constraints
@@ -488,22 +459,28 @@ class QuickTable{
             if(this.db_name === 'sqlite3'){
                 this.conn.run(statement,(err)=>{
                     if(err) throw err
-                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1]))
+                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
                 })
             }else{
                 this.conn.query(statement,(err)=>{
                     if(err) throw err
-                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1]))
+                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
                 })
             }
+            return this.table_fullname
         })()
+
+        return output
     }
 
     //drop table if deleted from its structure's module
-    drop(){
+    drop(arg){
         var droppingTable = []
 
-        var instances  = this.db_instances
+        var instances;
+        var mainTable;
+        arg ? instances = arg.instances : instances = this.db_instances
+        arg ? mainTable = arg.table : mainTable = this.table_fullname
        /* var e = this.extra
         var db_i = this.db_instances
         if(this.extra){
@@ -516,7 +493,7 @@ class QuickTable{
                 droppingTable.push(table)
             }
         }
-        droppingTable.push(`${this.table_fullname}`)
+        droppingTable.push(`${mainTable}`)
         droppingTable.map(a=>{
             var q =`DROP TABLE IF EXISTS ${a}`
             if(this.db_name === 'sqlite3'){
@@ -1203,7 +1180,7 @@ class QuickTable{
         Object.keys(this.db_instances).map((itm)=>{
             columns.push(itm)
         })
-        let tables = {table_name:`${this.table_fullname}`,columns,dataTypes,force:this.force,recentTable:this.tables}
+        let tables = {table_name:`${this.table_fullname}`,columns,dataTypes,force:this.force,recentTable:this.tables,app_name:this.app_name}
         //console.log(tables)
         return tables
     }
@@ -1504,6 +1481,172 @@ class QuickTable{
         })()
         return output
     }
+
+    AddColumn(q){
+        let m2mList = []
+        let PK;
+        let FK;
+        var regExp = /`NOT NULL`/igm
+        var regExp2 = /`DEFAULT`/igm
+        var statements = []
+        var statement = `ALTER TABLE ${this.table_fullname} ADD `
+        if(q.columnBody.motherTable){
+            //init table
+            var m2mTable = `${this.table_fullname}__${this.app_name}_${q.columnBody.motherTable}`
+            m2mList.push([`${this.app_name}_${q.columnBody.motherTable}`,m2mTable])
+        }
+        let __r__ = `${q.columnHead.toString()} ${q.columnBody.value.toString()}`;
+        var statement1 = statement+__r__
+
+        statements.push(statement1)
+        if ( q.columnBody.primaryKey ){
+            PK = `CONSTRAINT ${this.table_fullname}__${q.columnHead} PRIMARY KEY(${q.columnHead})`
+            var statement2 = statement+PK
+            statements.push(statement2)
+        }
+
+        if ( q.columnBody.referencedTable ){
+            var {referencedTable} = q.columnBody
+            FK = `CONSTRAINT FK_${this.table_fullname}__${q.columnHead} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
+            var statement2 = statement+FK
+            statements.push(statement2)
+        }
+
+        try{
+            if(q.columnBody.value.match(regExp) && q.columnBody.value.match(regExp2)){
+                statements.map(x=>{
+                    if(this.db_name === 'sqlite3'){
+                        this.conn.run(x,(err)=>{
+                            if(err) throw err
+                        })
+                    }else{
+                        this.conn.query(x,(err)=>{
+                            if(err) throw err
+                        })
+                    }
+                })
+                console.log(`Added column ${q.columnHead} to Table ${this.table_fullname}`)
+                m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],this.table_fullname))
+            } else {
+                throw `A default value must be specified when q.columnHead is set to NOT NULL`
+            }
+        } catch(err) {
+            console.log(err)
+        }
+    }
+
+    UpdateColumn(q){
+        var query = `ALTER TABLE ${this.table_fullname} RENAME TO ${this.table_fullname}_old`
+
+        if(this.db_name === 'sqlite3'){
+            this.conn.run(query,(err)=>{
+                if(err) throw err
+            })
+        }else{
+            this.conn.query(query,(err)=>{
+                if(err) throw err
+            })
+        }
+
+        (async ()=>{
+            var tableName_proto_ = await this.create(`${this.table_fullname}_proto_`)
+            var columns_proto_ = Object.keys(q.DT).join(',')
+            var query_proto_ = `INSERT INTO ${tableName_proto_}_proto_ (${columns_proto_}) SELECT ${columns_proto_} FROM ${tableName_proto_}_old`
+
+
+            if(this.db_name === 'sqlite3'){
+                this.conn.run(query_proto_,(err)=>{
+                    if(err) throw err
+                    this.drop({instances:q.DT,table:`${this.table_fullname}_old`})
+                })
+            }else{
+                this.conn.query(query_proto_,(err)=>{
+                    if(err) throw err
+                    this.drop({instances:q.DT,table:`${this.table_fullname}_old`})
+                })
+            }
+
+            var tableName = await this.create()
+            var columns = Object.keys(this.db_instances).join(',')
+            var query2 = `INSERT INTO ${tableName} (${columns}) SELECT ${columns} FROM ${tableName}_proto_`
+
+
+            if(this.db_name === 'sqlite3'){
+                this.conn.run(query2,(err)=>{
+                    if(err) throw err
+                    this.drop({table:`${this.table_fullname}_proto_`})
+                })
+            }else{
+                this.conn.query(query2,(err)=>{
+                    if(err) throw err
+                    this.drop({instances:q.DT,table:`${this.table_fullname}_proto_`})
+                })
+            }
+        })()
+
+        /*console.log(`Updated column ${q.columnHead} in Table ${this.table_fullname}`)
+        m2mList.map(itm=>this.createM2MTable(itm[0],itm[1]))*/
+    }
+
+    DropColumn(q){
+        var query = `ALTER TABLE ${this.table_fullname}
+                    DROP COLUMN ${q.column}`;
+        if(this.db_name === 'sqlite3'){
+            this.conn.run(query,(err)=>{
+                if(err) throw err
+            })
+        }else{
+            this.conn.query(query,(err)=>{
+                if(err) throw err
+            })
+        }
+
+        console.log(`Dropped column ${q.columnHead} from Table ${this.table_fullname}`)
+
+        if(q.m2m){
+            var {table} = this.knowTable(q.column)
+            var q = `DROP TABLE IF EXISTS ${table}`
+            if(this.db_name === 'sqlite3'){
+                this.conn.run(query,(err)=>{
+                    if(err) throw err
+                })
+            }else{
+                this.conn.query(query,(err)=>{
+                    if(err) throw err
+                })
+            }
+        }
+    }
+
+    Delete(q,given=true){
+        var query = `DELETE FROM table_name WHERE`
+        var query2 = `DELETE FROM table_name WHERE id='${q.id}'`
+        for(var each in q){
+            var add_to_query = `each='${q[each]}'`;
+            query += add_to_query
+        }
+        if(given){
+            if(this.db_name === 'sqlite3'){
+                this.conn.run(query,(err)=>{
+                    if(err) throw err
+                })
+            }else{
+                this.conn.query(query,(err)=>{
+                    if(err) throw err
+                })
+            }
+        } else {
+            if(this.db_name === 'sqlite3'){
+                this.conn.run(query2,(err)=>{
+                    if(err) throw err
+                })
+            }else{
+                this.conn.query(query2,(err)=>{
+                    if(err) throw err
+                })
+            }
+        }
+    }
 }
 
 
@@ -1521,22 +1664,28 @@ var initDataType = ( arg )=>{
 
         argF.Null ? qNull = '' : qNull = 'NOT NULL'
         argF.primaryKey ? primaryKey = true : primaryKey = false
+        var __args__ = {qNull,primaryKey}
 
         if(arg.Width){
             argF.width ? qWidth = `${argF.width}` : qWidth = ''
+            __args__['qWidth'] = qWidth
         }
         if(arg.Update){
             argF.onUpdate ? qUpdate = `ON UPDATE CASCADE` : qUpdate = ''
+            __args__['qUpdate'] = qUpdate
         }
         if(arg.Delete){
             argF.onDelete ? qDelete = `ON DELETE CASCADE` : qDelete = ''
+            __args__['qDelete'] = qDelete
         }
         if(arg.Decimal_Places){
             argF.decimal_places ? qDecimal_place = `,${argF.decimal_places}` : qDecimal_place = ''
+            __args__['qDecimal_place'] = qDecimal_place
         }
 
         if(arg.DefaultValue){
             argF.defaultValue ? qDefaultValue = `DEFAULT '${argF.defaultValue}'` : qDefaultValue = ''
+            __args__['qDefaultValue'] = qDefaultValue
         }
 
         if(arg.Decimal_Places && arg.Width){
@@ -1549,7 +1698,7 @@ var initDataType = ( arg )=>{
             bracket = ''
         }
 
-        return {value:`${arg.name}${bracket} ${qDefaultValue} ${qUpdate} ${qDelete} ${qNull}`,primaryKey}
+        return {value:`${arg.name}${bracket} ${qDefaultValue} ${qUpdate} ${qDelete} ${qNull}`,primaryKey,dataType:arg.name,...__args__}
     }
     return {field}
 }
@@ -1568,28 +1717,32 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : qUnique = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`BigInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`BigInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'BigInt',...__args__}
     }
 
     qBit( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qUnique = '';
         var primaryKey = '';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qUnique}
 
-        return {value:`Bit${qwidth} ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Bit${qWdth} ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Bit',...__args__}
     }
 
     qJson(arg) {
@@ -1599,7 +1752,8 @@ class DataType{
         } else {
             length = arg.length
         }
-        return {value:this.qVarchar({width:length}).value,JSON:true}
+        var __args__ = {qWidth:length}
+        return {value:this.qVarchar({width:length}).value,JSON:true,dataType:'Varchar',...__args__}
     }
 
     qSmallInt( arg ) {
@@ -1611,13 +1765,14 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`SmallInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`SmallInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'SmallInt',...__args__}
     }
 
     qDecimal( arg ) {
@@ -1625,31 +1780,37 @@ class DataType{
         var qDefaultValue = '';
         var primaryKey = '';
         var qWidth = 10;
+        var qUnique ='';
         var qDecimalPlace = 2;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.width ? qWidth = arg.width : qWidth = 10
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.decimal_places ? qDecimalPlace = arg.decimal_places : qDecimalPlace = 2
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qDecimalPlace,qUnique}
 
-        return {value:`Decimal(${qWidth},${decimal_places}) ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Decimal(${qWidth},${decimal_places}) ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Decimal',...__args__}
     }
 
     qSmallMoney( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qUnique = '';
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
         }
+        var __args__ = {qNull,qDefaultValue,qUnique}
 
-        return {value:`SmallMoney ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`SmallMoney ${qDefaultValue} ${qNull}`,primaryKey,dataType:'SmallMoney',...__args__}
     }
 
     qInt( arg ) {
@@ -1661,17 +1822,18 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
         let output;
         if(db_connection.db_name === 'sqlite3'){
-            output = {value:`Integer ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+            output = {value:`Integer ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'Integer',...__args__}
         } else {
-            output = {value:`Int${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+            output = {value:`Int${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'Int',...__args__}
         }
 
         return output
@@ -1686,27 +1848,31 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`TinyInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`TinyInt${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'TinyInt',...__args__}
     }
 
     qMoney( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qUnique
         var primaryKey = '';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qUnique}
 
-        return {value:`Money ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Money ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Money',...__args__}
     }
 
     qFloat( arg ) {
@@ -1714,79 +1880,98 @@ class DataType{
         var qDefaultValue = '';
         var qWidth = 10;
         var qDecimalPlace = 2;
+        var qUnique = '';
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.width ? qWidth = arg.width : qWidth = 10
             arg.decimal_places ? qDecimalPlace = arg.decimal_places : qDecimalPlace = 2
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`Float(${qWidth},${qDecimalPlace}) ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Float(${qWidth},${qDecimalPlace}) ${qDefaultValue} ${qNull}`,dataType:'Float',primaryKey,...__args__}
     }
 
     qDate( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qUnique = '';
+        var qAutoUpdate = false
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
-            primaryKey ? primaryKey = true : primaryKey = false
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
+            arg.primaryKey ? primaryKey = true : primaryKey = false
+            arg.qAutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
         }
-
-        return {value:`Date ${qDefaultValue} ${qNull}`,primaryKey}
+        var __args__ = {qNull,qUnique,qDefaultValue,qAutoUpdate}
+        return {value:`Date ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Date',...__args__}
     }
 
     qDatetime( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qUnique = '';
+        var qAutoUpdate = false;
         var primaryKey = '';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.qUnique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
+            arg.qAutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
         }
+        var __args__ = {qNull,qDefaultValue,qUnique,qAutoUpdate}
 
-        return {value:`DateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey}
+        return {value:`DateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey,dataType:'DateTime',...__args__}
     }
 
     qSmallDatetime( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qAutoUpdate = false;
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
+            arg.qAutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
         }
+        var __args__ = {qNull,qDefaultValue,qAutoUpdate}
 
-        return {value:`SmallDateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey}
+        return {value:`SmallDateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey,dataType:'SmallDateTime',...__args__}
     }
 
     qTime( arg ) {
         var qNull = '';
         var qDefaultValue = '';
+        var qAutoUpdate = false
         var primaryKey = '';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
+            arg.qAutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
         }
+        var __args__ = {qAutoUpdate,qNull,qDefaultValue}
 
-        return {value:`Time ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Time ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Time',...__args__}
     }
 
     qChar( arg ) {
         var qNull;
         var qDefaultValue;
         var qWidth;
+        var qUnique;
         var primaryKey;
 
         if(!arg) throw 'Please make sure you define the width'
@@ -1794,12 +1979,14 @@ class DataType{
         if(arg){
             if(!arg.width) throw 'Please make sure you define the width !!!'
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`Char${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Char${qWidth} ${qDefaultValue} ${qNull}`,primaryKey,dataType:'Char',...__args__}
     }
 
     qVarchar(arg) {
@@ -1814,13 +2001,14 @@ class DataType{
         if(arg){
             if(!arg.width) throw 'Please make sure you define the width !!!'
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`Varchar${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`Varchar${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'Varchar',...__args__}
     }
 
     qText( arg ) {
@@ -1831,12 +2019,13 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qUnique}
 
-        return {value:`Text ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`Text ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:'Text',...__args__}
     }
 
     qNChar( arg ) {
@@ -1851,12 +2040,13 @@ class DataType{
         if(arg){
             if(!arg.width) throw 'Please make sure you define the width'
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = true
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`NChar ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`NChar ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:`NChar`,...__args__}
     }
 
     qNVarchar( arg ) {
@@ -1871,13 +2061,14 @@ class DataType{
         if(arg){
             if(!arg.width) throw 'Please make sure you define the width'
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        return {value:`NVarchar${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`NVarchar${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:`NVarchar`,...__args__}
     }
 
     qNText( arg ) {
@@ -1888,44 +2079,51 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue,qUnique}
 
-        return {value:`NText ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey}
+        return {value:`NText ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey,dataType:`NText`,...__args__}
     }
 
     qBinary( arg ) {
         var qNull = '';
         var qDefaultValue = '';
         var qWidth = '';
+        var qUnique = '';
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qWidth,qDefaultValue,qWidth,qUnique}
 
-        return {value:`Binary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Binary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey,dataType:`Binary`,...__args__}
     }
 
     qVarBinary( arg ) {
         var qNull = '';
         var qDefaultValue = '';
         var qWidth = '';
+        var qUnique = '';
         var primaryKey = false;
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.width ? qWidth = `(${arg.width})` : qWidth = ''
+            arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true: primaryKey = false
         }
+        var __args__ = {qNull,qUnique,qDefaultValue,qWidth}
 
-        return {value:`VarBinary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`VarBinary${qWidth} ${qDefaultValue} ${qNull}`,primaryKey,dataType:`VarBinary`,...__args__}
     }
 
     qImage( arg ) {
@@ -1935,11 +2133,12 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue}
 
-        return {value:`Image ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Image ${qDefaultValue} ${qNull}`,primaryKey,dataType:`Image`,...__args__}
     }
 
     qBoolean( arg ) {
@@ -1949,22 +2148,23 @@ class DataType{
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
-            arg.defaultValue ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
+            arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
         }
+        var __args__ = {qNull,qDefaultValue}
 
-        return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey}
+        return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey,dataType:`Boolean`,...__args__}
     }
 
     qForeignKey(referencedTable){
         var {value} = this.qInt()
-        return {value,referencedTable}
+        return {value,referencedTable,dataType:`Int`}
     }
 
     qM2MKey(motherTable){
         var dValue = JSON.stringify([])
         var {value}  = this.qVarchar({width:10,defaultValue:dValue})
-        return {value,motherTable}
+        return {value,motherTable,dataType:`Varchar`}
     }
 }
 
@@ -2059,18 +2259,18 @@ var m = [
 var __ = new DataType()
 var e = {favourite:Operators().isIn(['blue']),male:true}
 var Table2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),age:__.qInt()})
-var Table = new QuickTable('MADZ',{name:__.qVarchar({Null:false,unique:true,width:100}),soli:__.qM2MKey('SOLI'),age:__.qInt(10)},force=false)
-var Table3 = new QuickTable('Capacity', {ike:__.qJson(),height:__.qInt(),muscleSize:__.qVarchar({width:10,primaryKey:true}), madz:__.qForeignKey('SOLI'),age:__.qInt()})
+var Table = new QuickTable('MADZ',{name:__.qVarchar({Null:false,unique:true,width:100}),soli:__.qM2MKey('SOLI'),age:__.qVarchar({width:10})})
+var Table3 = new QuickTable('Capacity', {ike:__.qJson(),height:__.qInt(),muscleSize:__.qVarchar({width:10,primaryKey:true}), madz:__.qForeignKey('SOLI'),age:__.qBoolean()})
 //myTable.insert({name:'cs',soli:Operators().m2mI([2],['id',2]),age:'20'});
 //myTable2.insert({name:'ie',age:'20'});
 //myTable3.insert({muscleSize:'big',madz:4,height:22,age:20,ike:[3,4,5]})
 /*var c = (async()=>{
-    let response2 = await myTable.extract({id:[[2,4]]},{m2mValue:{soli:'*'}})
+    //let response2 = await myTable.extract({id:[[2,4]]},{m2mValue:{soli:'*'}})
     //let key = response2[response2.length-1].id+1
     //myTable.insert({name:'nw',soli:Operators().m2mI([2],['id',key]),age:'20'});
     //myTable2.insert({name:'ike',age:'20'});
-    let response = await myTable2.find({id:1})
-    let response3 = await myTable3.all()
+    //let response = await myTable2.find({id:1})
+    let response3 = await Table3.all()
     //let appendData = myTable.append(response3,{love:m,passion:response},{love:{Join:'leftJoin'},passion:{Joiner:['id','madz'],Join:'innerJoin'}})
     //myTable.m2mA(response2[0].id,['soli',[2]])
     //myTable.m2mD(response2[0].id,['soli',[2]])
@@ -2088,16 +2288,16 @@ var Table3 = new QuickTable('Capacity', {ike:__.qJson(),height:__.qInt(),muscleS
             }
         }
     })
-    var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_MADZ`,statementType:'fetchWhere',JSON:true})
+    //var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_MADZ`,statementType:'fetchWhere',JSON:true})
     //console.log(s[0].soli)
-    console.log(d)
+    console.log(response3)
 })()*/
 //myTable2.create()
 //myTable.create()
-//myTable3.create)
+//Table3.drop()
 /*var t = initDataType({name:'MADZWORLD',Width:true,Update:true,Delete:true,DefaultValue:true, Decimal_Places:true})
 var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width:10,primaryKey:false, decimal_places:10})
 console.log(d)*/
 
 //module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
-module.exports = {Table,Table2,Table3}
+module.exports = {}

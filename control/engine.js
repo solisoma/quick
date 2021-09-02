@@ -79,7 +79,7 @@ let connect = (db_name,values)=>{
         conn = sqlite(values)
         sqlite(values)
     }
-    return {db_name:db_name,connector:conn}
+    return {db_name,connector:conn}
 }
 
 module.exports = {connect:connect}

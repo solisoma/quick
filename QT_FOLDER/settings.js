@@ -28,14 +28,14 @@ for pgsql it should be db_connection = connect('psql',{
                                                 maxUses://7500 optional
                                             })
 */
-let db_connection = connect('psql',{
+let db_connection = connect(/*'sqlite3','./db.sqlite3'/**/'psql',{
                                 user:'postgres',
                                 host:'localhost',
                                 database:'postgres',
                                 password:'ikechukwu',
                             })
 let app_name = 'xatisfy'
-let structures = ['/structure.js','/str.js']
+let structures = ['/structure.js']
 //structures location i:e te path to all your structures
 
 module.exports = {db_connection,app_name,structures}
