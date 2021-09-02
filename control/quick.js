@@ -3,16 +3,18 @@ const fs = require('fs')
 
 if(!(fs.readdirSync(RootDirectory).includes('QT_FOLDER'))){
     fs.mkdirSync(`${RootDirectory}/QT_FOLDER`)
+    console.log(`Directory "${RootDirectory}/QT_FOLDER" has being created\n`)
 }
 
 if(!(fs.readdirSync(`${RootDirectory}/QT_FOLDER`).includes('ToDeployFiles'))){
     fs.mkdirSync(`${RootDirectory}/QT_FOLDER/ToDeployFiles`)
+    console.log(`Directory "${RootDirectory}/QT_FOLDER/ToDeployFiles" has being created\n`)
 }
 
 const Directory = `${RootDirectory}/QT_FOLDER`
 
-const alreadyExistingFiles = [`${RootDirectory}/settings.js`,`${RootDirectory}/structure_tracker.js`,`${RootDirectory}/tracker.js`]
-const toBeCreatedFiles = [`${Directory}/settings.js`,`${Directory}/structure_tracker.js`,`${Directory}/tracker.js`]
+const alreadyExistingFiles = [`${RootDirectory}/settings.js`,`${RootDirectory}/tracker.js`]
+const toBeCreatedFiles = [`${Directory}/settings.js`,`${Directory}/tracker.js`]
 
 const multiTask = (alreadyExistingFiles,toBeCreatedFiles)=>{
     var holdValues = [];
@@ -38,4 +40,5 @@ const multiTask = (alreadyExistingFiles,toBeCreatedFiles)=>{
 
     }
 }
+
 multiTask(alreadyExistingFiles,toBeCreatedFiles)
