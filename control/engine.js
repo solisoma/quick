@@ -23,6 +23,10 @@ let psql = (val)=>{
 
     const PG = require('pg-pool');
 
+    if(!PG){
+        console.log('sorry postgresql cannot be found\rplease make sure postgresql is installed in your system')
+    }
+
     let port = 5432
     let ssl = false
     let max = 30
@@ -58,7 +62,7 @@ let sqlite = (val)=>{
     let sqlite = require('sqlite3').verbose();
 
     if(!sqlite){
-        console.log('sorry postgresql cannot be found\rplease make sure postgresql is installed in your system')
+        console.log('sorry sqlite3 cannot be found\rplease make sure sqlite3 is installed in your system')
     }
 
     var conn = new sqlite.Database(val,err=>{

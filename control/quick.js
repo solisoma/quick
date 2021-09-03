@@ -32,7 +32,7 @@ const multiTask = (alreadyExistingFiles,toBeCreatedFiles)=>{
         console.log('All files created successfully\n')
     }catch(err){
         if(err.name == 'TypeError' ){
-            result= `Make show you first two arguments are list\nExample: [C:/Users/myOwn/myWork.js, C:/Users/myOwn/myAnotherWork.js]\nif your list length is one: [C:/Users/myOwn/myWork.js,]`;
+            result= `Make sure your first two arguments are list\nExample: [C:/Users/myOwn/myWork.js, C:/Users/myOwn/myAnotherWork.js]\nif your list length is one: [C:/Users/myOwn/myWork.js,]`;
             console.log(result)
         }else{
             console.log(err)
