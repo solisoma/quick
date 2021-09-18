@@ -12,7 +12,8 @@ let mysql = (val)=>{
     var conn = mysql.createConnection({
         host:val.host,
         user:val.user,
-        password:val.password
+        password:val.password,
+        database:val.database
     })
 
     return conn
@@ -75,7 +76,7 @@ let connect = (db_name,values)=>{
     var conn;
     if(db_name == 'mysql'){
         conn = mysql(values)
-        mysql(value)
+        mysql(values)
     }else if(db_name == 'psql'){
         conn = psql(values)
         psql(values)

@@ -1,4 +1,5 @@
 const fs = require('fs')
+//const { Commands } = require('../QT_FOLDER/ToDeployFiles/16ToDeployFile')
 let {structures,db_connection} = require(`${process.cwd()}/QT_FOLDER/settings.js`)
 let RootDirectory = `${process.cwd()}/QT_FOLDER/ToDeployFiles`
 let Drop = []
@@ -8,8 +9,9 @@ let Update_Column = []
 let Update_SqliteColumn = []
 let Drop_Column = []
 let Rename_Column = []
+let ChangeTableName = []
 let checkDrop = []
-let AllStructures = {}
+let AllStructures = {} //To get all tables as a dict for easy manipulation and knowing which table to drop 
 let Update_structure_tracker = {}
 var FILE = fs.readdirSync(RootDirectory)
 
@@ -85,7 +87,8 @@ if(FILE.length === 0){
             Update_Column,
             Update_SqliteColumn,
             Drop_Column,
-            Rename_Column
+            Rename_Column,
+            ChangeTableName
     }
 } else {
     const {tables} = require(`${RootDirectory}/${FILE[FILE.length-1]}`)
@@ -99,6 +102,8 @@ if(FILE.length === 0){
             const tableDetails = files[i].collect()
             //console.log(tableDetails.dataTypes['madz'])
             let stopFlag = false
+
+
             if(stopFlag === false && tables[i] === undefined || files[i].force){
                 Create.push(i)
                 console.log(`Creating Table "${i}"`)
@@ -106,11 +111,18 @@ if(FILE.length === 0){
                 
             }
 
+            if(stopFlag === false && tables[i].table_name !== tableDetails.table_name){
+                const New_TableName = {Table:i, old_name:tables[i].table_name, new_name:tableDetails.table_name}
+                ChangeTableName.push(New_TableName)
+                console.log(`Changing Table name from "${tables[i].table_name}" to "${tableDetails.table_name}" in "${i}"`)
+                
+            }
+
             tableDetails.columns.map(a=>{
                 if(stopFlag === false && !(tables[i].columns.includes(a)) && !(tableDetails.dataTypes[a].rename[0])){
                     const New_Column_Detail = {Table:i,columnHead:a,columnBody:tableDetails.dataTypes[a]}
                     New_Column.push(New_Column_Detail)
-                    console.log(`Adding New Column "${a}" in Table "${i}"`)
+                    console.log(`Adding New Column "${a}" in "${i}"`)
                     
                 }
 
@@ -120,7 +132,7 @@ if(FILE.length === 0){
                     const Rename_Column_Detail = {Table:i,columnHead:a,initialHead:iH}
                     Rename_Column.push(Rename_Column_Detail)
                     checkDrop.push(tableDetails.dataTypes[a].rename[1])
-                    console.log(`Renaming Column "${iH}" to "${a}" in Table "${i}"`)
+                    console.log(`Renaming Column "${iH}" to "${a}" in "${i}"`)
                     
                 }
 
@@ -143,7 +155,7 @@ if(FILE.length === 0){
                         const Update_Column_Detail = {Table:i,/*DT:tables[i].dataTypes,*/columnHead:a,columnBody:{...tableDetails.dataTypes[a],PK,FK,m2m,...inputColumn}}
                         Update_Column.push(Update_Column_Detail)
                         console.log(Update_Column)
-                        console.log(`Updating Column "${a}" in Table "${i}"`)
+                        console.log(`Updating Column "${a}" in "${i}"`)
 
                     } else if(db_connection.db_name == 'sqlite3'){
                         var m2m = false ;
@@ -151,7 +163,7 @@ if(FILE.length === 0){
                         const Drop_Column_Details = {Table:i,column:a,m2m}
                         const New_Column_Details = {Table:i,columnHead:a,columnBody:tableDetails.dataTypes[a]}
                         Update_SqliteColumn.push([Drop_Column_Details,New_Column_Details])
-                        console.log(`Updating Column "${a}" in Table "${i}"`)
+                        console.log(`Updating Column "${a}" in "${i}"`)
                     }
                 }
             })
@@ -176,7 +188,7 @@ if(FILE.length === 0){
                     if(tables[i].dataTypes[itm].motherTable) m2m=true;
                     const Drop_Column_Detail = {Table:i,column:itm,m2m}
                     Drop_Column.push(Drop_Column_Detail)
-                    console.log(`Dropping Column "${itm}" in Table "${i}"`)
+                    console.log(`Dropping Column "${itm}" in "${i}"`)
                     
                 }
             }
@@ -190,21 +202,53 @@ if(FILE.length === 0){
         Update_Column,
         Update_SqliteColumn,
         Drop_Column,
-        Rename_Column
+        Rename_Column,
+        ChangeTableName
     }
 
     //console.log({Command,Update_structure_tracker})
 }
 
-var StringifyCommand = JSON.stringify(Command)
+var writetoDeployFileCommands = '\n'
+for(var i in Command){
+    var list = '\n'
+    Command[i].map(u=>{
+        list += `\t\t${JSON.stringify(u)},\n`
+    })
+    var listCover;
+
+    if(Command[i].length == 0){
+        listCover = `[]`
+    } else {
+        listCover = `[`+
+                        `${list}`+
+                    `\t]`
+    }
+    
+    writetoDeployFileCommands += `\t${i}:${listCover},\n`
+}
+
+var writetoDeployFileTables = '\n'
+for(var i in Update_structure_tracker){
+    var keys = '\n'
+    for(var k in Update_structure_tracker[i]){
+        keys += `\t\t${k}:${JSON.stringify(Update_structure_tracker[i][k])},\n`
+    }
+    var keyCover = `{`+
+                    `${keys}`+
+                `\t}`
+    writetoDeployFileTables += `\t${i}:${keyCover},\n`
+}
 
 const CommandsI = {
     Drop:[],
     Create:[],
     New_Column:[],
     Update_Column:[],
+    Update_SqliteColumn:[],
     Drop_Column:[],
-    Rename_Column:[]
+    Rename_Column:[],
+    ChangeTableName:[]
 }
 
 if(JSON.stringify(Command) === JSON.stringify(CommandsI)){
@@ -213,11 +257,14 @@ if(JSON.stringify(Command) === JSON.stringify(CommandsI)){
         var regExp = /\d+/igm
         if(FILE.length == 0){
             fs.writeFileSync(
-            `${RootDirectory}/00ToDeployFile.js`,
-`const Commands = ${StringifyCommand}
-const tables = ${JSON.stringify(Update_structure_tracker)}
-
-module.exports = {Commands,tables}`
+                `${RootDirectory}/00ToDeployFile.js`,
+                `const Commands = {`+
+                    `${writetoDeployFileCommands}`+
+                `}\n\n`+
+                `const tables = {`+
+                    `${writetoDeployFileTables}`+
+                `}\n\n`+
+                `module.exports = {Commands,tables}`
             )
         }else{
             var checkFile = FILE[FILE.length-1].match(regExp)
@@ -231,12 +278,16 @@ module.exports = {Commands,tables}`
                 var main = add.toString()+'ToDeployFile.js'
                 output = main
             }
+
             fs.writeFileSync(
                 `${RootDirectory}/${output}`,
-`const Commands = ${StringifyCommand}
-const tables = ${JSON.stringify(Update_structure_tracker)}
-
-module.exports = {Commands,tables}`
+                `const Commands = {`+
+                    `${writetoDeployFileCommands}`+
+                `}\n\n`+
+                `const tables = {`+
+                    `${writetoDeployFileTables}`+
+                `}\n\n`+
+                `module.exports = {Commands,tables}`
             )
             /*fs.writeFileSync(`${process.cwd()}/QT_FOLDER/structure_tracker.js`,
 `//contains the tables created column and features

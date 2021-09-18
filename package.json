@@ -1,15 +1,27 @@
 {
-  "name": "qt",
+  "name": "quicktable",
   "version": "1.0.0",
-  "description": "",
   "main": "public_access.js",
   "scripts": {
     "qt_init": "node control/quick",
     "qt_deploy": "node control/deploy",
-    "qt_set": "node control/set",
-    "qt_table": "node structure"
+    "qt_set": "node control/set"
   },
   "keywords": [],
   "author": "solisoma",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solisoma/quick.git"
+  },
+  "bugs": {
+    "url": "https://github.com/solisoma/quick/issues"
+  },
+  "homepage": "https://github.com/solisoma/quick#readme",
+  "description": "",
+  "dependencies": {
+    "mysql": "^2.18.1",
+    "pg": "^8.7.1",
+    "pg-pool": "^3.4.1"
+  }
 }

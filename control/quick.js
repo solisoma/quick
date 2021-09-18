@@ -1,4 +1,4 @@
-const {RootDirectory} = require('../public_access.js')
+const {RootDirectory} = require('../accessor.js')
 const fs = require('fs')
 
 if(!(fs.readdirSync(RootDirectory).includes('QT_FOLDER'))){
