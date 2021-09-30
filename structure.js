@@ -1,14 +1,19 @@
 //structures, methods and functions
-
-let {db_connection,app_name} = require(`${process.cwd()}/QT_FOLDER/settings.js`) //call the app_name and connection instance from setting
+// var path = require('path')
+// let {db_connection,app_name} = require(`${path.dirname(path.dirname(process.cwd()))}/QT_FOLDER/settings.js`) //call the app_name and connection instance from setting
 
 //function for querying the database (sqlite3)
-var getQueryA = async(a,b,c)=>{
+
+// const reservedWords = [
+//     'add','admindb','all','absolute','alphanumeric','text','alter','binary','bit_length','byte','catalog',
+//     'character','char','char_length','character_length',
+// ]
+const getQueryA = async(a,b,c,d)=>{
     return new Promise((resolve,reject) => {
-        db_connection.connector.all(a,b,(err,rows) => {
+        c.all(a,b,(err,rows) => {
            if(err){return reject(err);}
            //return one instance (first) if c === true else return all
-           if(c){
+           if(d){
              resolve(rows[0])
            } else {
              resolve(rows)
@@ -18,16 +23,16 @@ var getQueryA = async(a,b,c)=>{
 }
 
 //function for querying the database (psql and mysql)
-var getQueryB = async(a,b,c)=>{
+const getQueryB = async(a,b,c,d)=>{
     return new Promise((resolve,reject) => {
-        db_connection.connector.query(a,b,(err,res) => {
+        c.query(a,b,(err,res) => {
            if(err){return reject(err)}
            //return one instance (first) if c === true else return all
-           if(c) {
-                var ret = db_connection.db_name === 'mysql' ? res[0] : res.rows[0] //res.rows ? res.rows[0] : undefined
+           if(d) {
+                var ret = c.db_name === 'mysql' ? res[0] : res.rows[0] //res.rows ? res.rows[0] : undefined
                 resolve(ret)
            } else {
-                var ret = db_connection.db_name === 'mysql' ? res : res.rows
+                var ret = c.db_name === 'mysql' ? res : res.rows
                 resolve(ret)
            }
          });
@@ -254,30 +259,56 @@ function Operators(){
 //quick table class
 class QuickTable{
 
-    constructor(table_name,db_instances,force=false){
-        this.conn = db_connection.connector //connector
-        this.db_name = db_connection.db_name //db_name
-        this.app_name = app_name //app_name
+    constructor(table_name,db_instances,settings,force=false){
+        this.conn = settings.db_connection.connector //connector
+        this.db_name = settings.db_connection.db_name //db_name
+        this.app_name = settings.app_name //app_name
         this.table_name = table_name //table_name
-        this.table_fullname = `${app_name}_${table_name}` //table_fullname
+        this.table_fullname = `${this.app_name}_${this.table_name}` //table_fullname
         this.db_instances = db_instances //All the instances [column and its datatypes]
         this.force = force //tells the commands to drop and create table if set to true
-        this.PK = [] //tells number of pk
+
+    }
+
+    //check for multiple primary key
+    checkMultiplePK(){
         try{
+            let PK = [] //tells number of pk
             for(var i in this.db_instances){
 
                 if(this.db_instances[i].primaryKey){
-                    this.PK.push(i)
+                    PK.push(i)
                 }
 
-                if(this.PK.length > 1){
+                if(PK.length > 1){
                     throw 'PRIMARY KEY SHOULD BE IN ONE COLUMN ONLY\n YOU HAVE MORE THAN ONE COLUMN WITH PRIMARY KEY'
                 }
             }
         }catch(err){
             console.error(err)
         }
+    }
 
+    //check for sql reserved words
+    // checkReservedWords(){
+    //     try{
+    //         for (var i in this.db_instances){
+    //             if(reservedWords.includes(i.toLowerCase())){
+    //                 throw `Change the column name "${i}"  it is a SQL reserved word`
+    //             }
+    //         }
+    //     }catch(err){
+    //         console.error(err)
+    //     }
+    // }
+
+    //End connection
+    endConnection(a){
+        this.db_name === 'sqlite3' ?
+        setTimeout(()=>{
+            settings.db_connection.close()
+        },300)   
+        : null
     }
 
     //used to read to read none operators and convert them to the right command
@@ -498,17 +529,21 @@ class QuickTable{
         if(this.db_name === 'sqlite3'){
             this.conn.run(create_table,(err)=>{
                 if(err) throw err
+                this.endConnection()
             })
         }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
             this.conn.query(create_table,(err)=>{
                 if(err) throw err
+                this.endConnection()
             })
         }
     }
     //create tables
     create(a){
+        this.checkMultiplePK()
         var output = (async()=>{
             var tableFullname;
+            this.PK = [] //tells number of pk
             var instances;
             a && a.table ? tableFullname = a.table : tableFullname = this.table_fullname
             a && a.instances ? instances = a.instances : instances = this.db_instances
@@ -525,7 +560,7 @@ class QuickTable{
 
             //drop table before creating if force === true
             if(this.force){
-                this.drop()
+                this.drop({drop:true})
                 statement = `CREATE TABLE ${tableFullname}(${queryIt}`
             }
 
@@ -542,7 +577,8 @@ class QuickTable{
                     var m2mTable = `${tableFullname}__${this.app_name}_${instances[f].motherTable}`
                     m2mList.push([`${this.app_name}_${instances[f].motherTable}`,m2mTable])
                 }
-                let __r__ = `, ${f.toString()} ${instances[f].value.toString()}`;
+                let __r__ = this.db_name === 'psql' ?  `, "${f.toString()}" ${instances[f].value.toString()}` 
+                            : `, ${f.toString()} ${instances[f].value.toString()}` 
                 statement += __r__
 
                 //If instance contains a primaryKey run the below command
@@ -611,11 +647,13 @@ class QuickTable{
             if(this.db_name === 'sqlite3'){
                 this.conn.run(q,(err)=>{
                     if(err) throw err;
+                    arg.drop ? this.endConnection() : null
                     //console.log(`${a} dropped`)
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                 this.conn.query(q,(err)=>{
                     if(err) throw err
+                    arg.drop ? this.endConnection() : null
                     //console.log(`${a} dropped`)
                 })
             }
@@ -643,25 +681,27 @@ class QuickTable{
 
                 if(this.db_name === 'sqlite3'){
                     (async()=>{
-                        let QueryReturn = await getQueryA(qq_sqlite3,parameter,true) //check if value already exist in m2m column
+                        let QueryReturn = await getQueryA(qq_sqlite3,parameter,this.conn,true) //check if value already exist in m2m column
                         
                         //if undefined insert the value
                         if (QueryReturn === undefined ) {
                             this.conn.run(q_sqlite3,(err)=>{
                                 if(err) throw `cannot not be inserted into '${n}' column because the mother table ${motherTable} or the main table ${this.table_fullname} with such id does not exist`//err
+                                this.endConnection()
                             })
                         }
                     })()
                 } else if(this.db_name === 'psql' ||  this.db_name === 'mysql') {
                    (async()=>{
                         var main_qq = this.db_name == 'psql' ? qq_psql : qq_mysql
-                        let QueryReturn = await getQueryB(main_qq,parameter,true) //check if value already exist in m2m column
+                        let QueryReturn = await getQueryB(main_qq,parameter,this.conn,true) //check if value already exist in m2m column
                         var main_q = this.db_name == 'psql' ? q_psql : q_mysql
 
                         //if undefined insert the value
                         if (QueryReturn === undefined ) {
                             this.conn.query(main_q,(err)=>{
                                 if(err) throw `cannot not be inserted into '${n}' column because the mother table ${motherTable} or the main table ${this.table_fullname} with such id does not exist`//err
+                                this.endConnection()
                             })
                         }
                     })()
@@ -689,7 +729,7 @@ class QuickTable{
                     insert_values[f] = _values[f]
                     m2mList.push(insert_values)
             } else if(this.db_instances[f] && this.db_instances[f].JSON){ //check for json
-                __columns__+= `${f}`;
+                __columns__+= this.db_name == 'psql' ? `"${f}"`: `${f}`;
                 var stringValue = JSON.stringify(_values[f])
                 parameter.push(stringValue)
 
@@ -711,7 +751,7 @@ class QuickTable{
 
             } else {
                 if(_v_length == 1){
-                    __columns__+= `${f}`;
+                    __columns__+= this.db_name == 'psql' ? `"${f}"`: `${f}`;
                     parameter.push(_values[f])
                     
                     __values__+= this.db_name === 'sqlite3' ? '?'
@@ -720,7 +760,7 @@ class QuickTable{
                     : null
                 }else{
                     if(_i_i_ < _i_counter__){
-                        __columns__+= `${f},`;
+                        __columns__+= this.db_name == 'psql' ? `"${f}"`: `${f}`;
                         parameter.push(_values[f]);
 
                         __values__+= this.db_name === 'sqlite3' ? '?,'
@@ -729,7 +769,7 @@ class QuickTable{
                         : null
 
                     }else{
-                        __columns__+=`${f}`;
+                        __columns__+=this.db_name == 'psql' ? `"${f}"`: `${f}`;
                         parameter.push(_values[f]);
 
                         __values__+= this.db_name === 'sqlite3' ? '?'
@@ -746,7 +786,7 @@ class QuickTable{
         for(var i in this.db_instances){
             var y = parameter.length+1
             if(this.db_instances[i].dataType === ('Date'||'SmallDateTime'||'DateTime'||'Time') && this.db_instances[i].AutoUpdate){
-                __columns__+=`${i}`
+                __columns__+=this.db_name == 'psql' ? `"${i}"`: `${i}`;
                 parameter.push(this.db_instances[i].AutoFunc())
 
                 __values__+= this.db_name === 'sqlite3' ? ',?'
@@ -787,7 +827,7 @@ class QuickTable{
         var params = []
         for(var i in __values_){
             var paramValue = this.db_name === 'sqlite3' || this.db_name === 'mysql' ? '?' : this.db_name === 'psql' ? `$${psql_i}` : null
-            var add = ` ${i} = ${paramValue}`
+            var add = this.db_name == 'psql' ? ` "${i}" = ${paramValue}` : ` ${i} = ${paramValue}`
             if(this.db_instances[i] && this.db_instances[i].JSON){
                 params.push(JSON.stringify(__values_[i])) 
             } else if( this.db_instances[i] && this.db_instances[i].m2m ){ 
@@ -811,10 +851,12 @@ class QuickTable{
         if(this.db_name === 'sqlite3'){
             this.conn.run(q,params,(err)=>{
                 if(err) throw err
+                this.endConnection()
             })
         }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
             this.conn.query(q,params,(err)=>{
                 if(err) throw err
+                this.endConnection()
             })
         }
     }
@@ -963,7 +1005,7 @@ class QuickTable{
             // console.log(q,parameter)
             let response;
             try{
-                this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter,true) : response = await getQueryB(q,parameter,true) //query the DB
+                this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter,this.conn,true) : response = await getQueryB(q,parameter,this.conn,true) //query the DB
             } catch(e) {
                 console.error(`An error occurred:${e}`)
             }
@@ -1005,7 +1047,7 @@ class QuickTable{
                             let {table} = this.knowTable(n)
                             var Qq = `SELECT id_main_table, id_referenced_table FROM ${table} WHERE ${m2mSearch}`
                             var m2mQueryReturn;
-                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,m2mParam) : m2mQueryReturn = await getQueryB(Qq,m2mParam) //query DB
+                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,m2mParam,this.conn) : m2mQueryReturn = await getQueryB(Qq,m2mParam,this.conn) //query DB
                             //push only id if the val of m2m is not given
                             if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
                                 m2mQueryReturn.map(itm=>{
@@ -1020,7 +1062,7 @@ class QuickTable{
                                     if( response.id === m2mQueryReturn[k].id_main_table ) {
                                         var qq = `SELECT ${otherQuery.m2mValue[n]} FROM ${motherTable} WHERE id='${m2mQueryReturn[k].id_referenced_table}'`
                                         var returnedQuery;
-                                        this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],true) : returnedQuery = await getQueryB(qq,[],true)
+                                        this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn,true) : returnedQuery = await getQueryB(qq,[],this.conn,true)
                                         response[n].push(returnedQuery)
                                     }
                                 }
@@ -1046,7 +1088,7 @@ class QuickTable{
                             let {table} = this.knowTable(n)
                             var Qq = `SELECT id_main_table, id_referenced_table FROM ${table}`
                             var m2mQueryReturn;
-                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[]) : m2mQueryReturn = await getQueryB(Qq,[])
+                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[],this.conn) : m2mQueryReturn = await getQueryB(Qq,[],this.conn)
                             if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
                                 m2mQueryReturn.map(items=>{
                                     if( response.id === items.id_main_table ) {
@@ -1061,7 +1103,7 @@ class QuickTable{
                                         var qq = `SELECT ${otherQuery.m2mValue[n]} FROM ${motherTable} WHERE id='${m2mQueryReturn[k].id_referenced_table}'`
                                         //console.log(qq)
                                         var returnedQuery;
-                                        this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],true) : returnedQuery = await getQueryB(qq,[],true)
+                                        this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn,true) : returnedQuery = await getQueryB(qq,[],this.conn,true)
                                         response[n].push(returnedQuery)
                                     }
                                 }
@@ -1075,6 +1117,11 @@ class QuickTable{
 
             return response
         })()
+        var ALLOW_FUNCTION_BELOW_TO_BE_EXECUTED_WITHOUT_ERROR;
+        (async()=>{
+           await output
+           this.endConnection() 
+        })()
         return output
     }
 
@@ -1085,11 +1132,13 @@ class QuickTable{
             if(this.db_name === 'sqlite3'){
                 this.conn.run(query.statement,query.parameter,(err)=>{
                     if(err) throw err
+                    query.m2mList.length == 0 ? this.endConnection() : null //If m2mList is empty end the connection
                     query.m2mList.map(i=>this.insertM2MTable(i)) //console.log(`values inserted into table ${this.table_fullname}`)
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                 this.conn.query(query.statement,query.parameter,(err)=>{
                     if(err) throw err
+                    query.m2mList.length == 0 ? this.endConnection() : null  //If m2mList is empty end the connection
                     query.m2mList.map(i=>this.insertM2MTable(i))
                 })
             }
@@ -1283,7 +1332,7 @@ class QuickTable{
             let response;
             let itemToRemove = []
             try{
-                this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter) : response = await getQueryB(q,parameter) //query the DB
+                this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter,this.conn) : response = await getQueryB(q,parameter,this.conn) //query the DB
             } catch(e) {
                 console.error(`An error occurred:${e}`)
             }
@@ -1326,7 +1375,7 @@ class QuickTable{
                             let {table} = this.knowTable(n)
                             var Qq = `SELECT id_main_table, id_referenced_table FROM ${table} WHERE ${m2mSearch}`
                             var m2mQueryReturn;
-                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,m2mParam) : m2mQueryReturn = await getQueryB(Qq,m2mParam) //Query DB
+                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,m2mParam,this.conn) : m2mQueryReturn = await getQueryB(Qq,m2mParam,this.conn) //Query DB
                             //if otherQuery is not given send id to the response
                             if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
                                 response.map(itm=>{
@@ -1344,7 +1393,7 @@ class QuickTable{
                                         if( response[m].id === m2mQueryReturn[k].id_main_table ) {
                                             var qq = `SELECT ${otherQuery.m2mValue[n]} FROM ${motherTable} WHERE id='${m2mQueryReturn[k].id_referenced_table}'`
                                             var returnedQuery;
-                                            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],true) : returnedQuery = await getQueryB(qq,[],true)
+                                            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn,true) : returnedQuery = await getQueryB(qq,[],this.conn,true)
                                             response[m][n].push(returnedQuery)
                                         }
                                     }
@@ -1371,7 +1420,7 @@ class QuickTable{
                             let {table} = this.knowTable(n)
                             var Qq = `SELECT id_main_table, id_referenced_table FROM ${table}`
                             var m2mQueryReturn;
-                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[]) : m2mQueryReturn = await getQueryB(Qq,[])
+                            this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[],this.conn) : m2mQueryReturn = await getQueryB(Qq,[],this.conn)
 
                             //if !otherQuery
                             if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
@@ -1392,7 +1441,7 @@ class QuickTable{
                                             var qq = `SELECT ${otherQuery.m2mValue[n]} FROM ${motherTable} WHERE id='${m2mQueryReturn[k].id_referenced_table}'`
                                             //console.log(qq)
                                             var returnedQuery;
-                                            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],true) : returnedQuery = await getQueryB(qq,[],true)
+                                            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn,true) : returnedQuery = await getQueryB(qq,[],this.conn,true)
                                             response[m][n].push(returnedQuery)
                                         }
                                     }
@@ -1409,6 +1458,13 @@ class QuickTable{
 
             return response
         })()
+
+        var ALLOW_FUNCTION_BELOW_TO_BE_EXECUTED_WITHOUT_ERROR;
+        (async()=>{
+           await output
+           this.endConnection() 
+        })()
+
         return output
     }
 
@@ -1448,7 +1504,7 @@ class QuickTable{
             a+=order_
             let response;
             try{
-                this.db_name == 'sqlite3' ? response = await getQueryA(a,[]) : response = await getQueryB(a,[]) //query from DB
+                this.db_name == 'sqlite3' ? response = await getQueryA(a,[],this.conn) : response = await getQueryB(a,[],this.conn) //query from DB
             } catch(e) {
                 console.error(`An error occurred:${e}`)
             }
@@ -1468,7 +1524,7 @@ class QuickTable{
                     let {table} = this.knowTable(n)
                     var Qq = `SELECT id_main_table, id_referenced_table FROM ${table}`
                     var m2mQueryReturn;
-                    this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq) : m2mQueryReturn = await getQueryB(Qq)
+                    this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[],this.conn) : m2mQueryReturn = await getQueryB(Qq,[],this.conn)
                     //if !otherQuery
                     if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
                             response.map(itm=>{
@@ -1488,7 +1544,7 @@ class QuickTable{
                                     var qq = `SELECT ${otherQuery.m2mValue[n]} FROM ${motherTable} WHERE id='${m2mQueryReturn[k].id_referenced_table}'`
                                     //console.log(qq)
                                     var returnedQuery;
-                                    this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,true) : returnedQuery = await getQueryB(qq,true)
+                                    this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn,true) : returnedQuery = await getQueryB(qq,[],this.conn,true)
                                     response[m][n].push(returnedQuery)
                                 }
                             }
@@ -1498,6 +1554,13 @@ class QuickTable{
             }
             return response
         })()
+
+        var ALLOW_FUNCTION_BELOW_TO_BE_EXECUTED_WITHOUT_ERROR;
+        (async()=>{
+           await output
+           this.endConnection() 
+        })()
+        
         return output
     }
 
@@ -1709,21 +1772,23 @@ class QuickTable{
             var param = [id,a]
             if(this.db_name === 'sqlite3'){
                 (async()=>{
-                    let QueryReturn = await getQueryA(qq,param,true)
+                    let QueryReturn = await getQueryA(qq,param,this.conn,true)
                     //execute code only if QueryReturn is undefined
                     if (QueryReturn === undefined ) {
                         this.conn.run(q,param,(err)=>{
                             if(err) throw err
+                            this.endConnection()
                         })
                     }
                     //console.log(QueryReturn)
                 })()
             } else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                (async()=>{
-                    let QueryReturn = await getQueryB(qq,param,true)
+                    let QueryReturn = await getQueryB(qq,param,this.conn,true)
                     if (QueryReturn === undefined ) {
                         this.conn.query(q,param,(err)=>{
                             if(err) throw err
+                            this.endConnection()
                         })
                     }
                     //console.log(QueryReturn)
@@ -1752,22 +1817,24 @@ class QuickTable{
             var param = [id,a]
             if(this.db_name === 'sqlite3'){
                 (async()=>{
-                    let QueryReturn = await getQueryA(qq,param,true)
+                    let QueryReturn = await getQueryA(qq,param,this.conn,true)
                     //execute code only if QueryReturn is defined
                     if (QueryReturn) {
                         this.conn.run(q,param,(err)=>{
                             if(err) throw err
+                            this.endConnection()
                         })
                     }
                     //console.log(QueryReturn)
                 })()
             } else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                (async()=>{
-                    let QueryReturn = await getQueryB(qq,param,true)
+                    let QueryReturn = await getQueryB(qq,param,this.conn,true)
                     //console.log(q)
                     if (QueryReturn) {
                         this.conn.query(q,param,(err)=>{
                             if(err) throw err
+                            this.endConnection()
                         })
                     }
                     //console.log(QueryReturn)
@@ -1786,7 +1853,7 @@ class QuickTable{
             var table = `${this.app_name}_${Table.table_name}__${this.table_fullname}`
             var qq = `SELECT * FROM ${table} WHERE id_referenced_table='${pointer}'`
             var returnedQuery;
-            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[]) : returnedQuery = await getQueryB(qq,[])//query DB
+            this.db_name == 'sqlite3' ? returnedQuery = await getQueryA(qq,[],this.conn) : returnedQuery = await getQueryB(qq,[],this.conn)//query DB
 
             var response = 'This instances has no child yet\n'
            if(returnedQuery.length !== 0){
@@ -1817,23 +1884,55 @@ class QuickTable{
                         var query = await this.all()
                         returnee = query
                     } else {
-                        this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement,arg.params) : returnee = await getQueryB(arg.statement,arg.params)
+                        if(this.db_name === 'sqlite3'){
+                            returnee = await getQueryA(arg.statement,arg.params,this.conn)
+                            (async()=>{
+                                await getQueryA(arg.statement,arg.params,this.conn)
+                               this.endConnection() 
+                            })()
+                        } else {
+                            returnee = await getQueryB(arg.statement,arg.params,this.conn)
+                            (async()=>{
+                                await getQueryB(arg.statement,arg.params,this.conn)
+                               this.endConnection() 
+                            })()
+                        }
                     }
                 } else if(arg.statementType === 'fetchWhere'){ //if statementType is fetchWhere
                     if(arg.M2M || arg.JSON){
                         var query = await this.extract(arg.statement,{statementGiven:true})
                         returnee = query
                     } else {
-                        this.db_name === 'sqlite3' ? returnee = await getQueryA(arg.statement,arg.params) : returnee = await getQueryB(arg.statement,arg.params)
+                        if(this.db_name === 'sqlite3'){
+                            returnee = await getQueryA(arg.statement,arg.params,this.conn)
+                            (async()=>{
+                                await getQueryA(arg.statement,arg.params,this.conn)
+                               this.endConnection() 
+                            })()
+                        } else {
+                            returnee = await getQueryB(arg.statement,arg.params,this.conn)
+                            (async()=>{
+                                await getQueryB(arg.statement,arg.params,this.conn)
+                               this.endConnection() 
+                            })()
+                        }
                     }
                 } else if(arg.statementType === 'command'){
                     if(this.db_name === 'sqlite3'){
                         this.conn.run(arg.statement,arg.params,(err)=>{
-                            if(err) returnee = 'Command not successful'; throw err
+                            if(err) {
+                                returnee = 'Command not successful';
+                                throw err
+                            }
+                            this.endConnection()
                         })
                     }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                         this.conn.query(arg.statement,arg.params,(err)=>{
-                            if(err) returnee = 'Command not successful'; throw err
+                            if(err){
+                                returnee = 'Command not successful'
+                                throw err
+                            }
+                            this.endConnection()
                         })
                     }
                 }
@@ -1851,12 +1950,16 @@ class QuickTable{
         let FK;
         var statements = []
         var statement = `ALTER TABLE ${this.table_fullname} ADD `
+
+        this.checkMultiplePK()
+
         if(q.columnBody.motherTable){
             //init table
             var m2mTable = `${this.table_fullname}__${this.app_name}_${q.columnBody.motherTable}`
             m2mList.push([`${this.app_name}_${q.columnBody.motherTable}`,m2mTable])
         }
-        let __r__ = `${q.columnHead.toString()} ${q.columnBody.value.toString()}`;
+        let __r__ = this.db_name === 'psql' ? `"${q.columnHead.toString()}" ${q.columnBody.value.toString()}`
+                    : `${q.columnHead.toString()} ${q.columnBody.value.toString()}`
         var statement1 = statement+__r__
 
         statements.push(statement1)
@@ -1879,11 +1982,13 @@ class QuickTable{
                     if(this.db_name === 'sqlite3'){
                         this.conn.run(x,(err)=>{
                             if(err) throw err
+                            m2mList.length == 0 ? this.endConnection() : null
                             console.log(`Added column ${q.columnHead} to Table ${this.table_fullname}`)
                         })
                     }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                         this.conn.query(x,(err)=>{
                             if(err) throw err
+                            m2mList.length == 0 ? this.endConnection() : null
                             console.log(`Added column ${q.columnHead} to Table ${this.table_fullname}`)
                         })
                     }
@@ -1898,18 +2003,20 @@ class QuickTable{
     }
 
     RenameColumn(q){
-        var query = `ALTER TABLE ${this.table_fullname }
-                    RENAME COLUMN ${q.initialHead} TO ${q.columnHead}` ;
+        var query =this.db_name == 'psql' ? `ALTER TABLE ${this.table_fullname }
+                    RENAME COLUMN "${q.initialHead}" TO "${q.columnHead}"` 
+                    : `ALTER TABLE ${this.table_fullname }
+                    RENAME COLUMN ${q.initialHead} TO ${q.columnHead}`;
 
         if(this.db_name === 'sqlite3'){
             this.conn.run(query,(err)=>{
                 if(err) throw err
+                this.endConnection()
             })
         }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
             this.conn.query(query,(err)=>{
-                if(err){
-                    throw err 
-                };
+                if(err) throw err 
+                this.endConnection()
             })
         }
 
@@ -1921,10 +2028,12 @@ class QuickTable{
         if(this.db_name === 'sqlite3'){
             this.conn.run(query,(err)=>{
                 if(err) throw err ;
+                this.endConnection()
             })
         }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
             this.conn.query(query,(err)=>{
                 if(err) throw err ; 
+                this.endConnection()
             })
         }
 
@@ -2003,60 +2112,61 @@ class QuickTable{
                 var addConstraints = []
                 var removeConstraints = []
                 var keys = Object.keys(column.columnBody)
-                if(keys.includes('NULL')){
-                    if(column.columnBody.NULL == 'YES'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} SET NULL` 
+                if(keys.includes('NOTNULL')){
+                    if(column.columnBody.NOTNULL == 'YES'){
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" SET NOT NULL` 
                         addConstraints.push(statement)
                     } else if(column.columnBody.NULL == 'NO'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} SET NOT NULL` 
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" DROP NOT NULL` 
                         removeConstraints.push(statement)
                     } 
                 }
                 if(keys.includes('DefaultValue')){
                     if(column.columnBody.DefaultValue == 'YES'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} SET DEFAULT=${column.columnBody.qDefaultValue}` 
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" SET ${column.columnBody.qDefaultValue}` 
                         addConstraints.push(statement)
                     } else if(column.columnBody.DefaultValue == 'NO'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} DROP DEFAULT`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" DROP DEFAULT`
                         removeConstraints.push(statement)
                     } 
                 }
                 if(keys.includes('Width')){
                     if(column.columnBody.Width == 'YES'){
                         if(column.columnBody.dataType == ('Decimal' || 'Float')){
-                            let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} TYPE ${column.columnBody.dataType}(${column.columnBody.qWidth}${column.columnBody.qDecimalPlace})` 
+                            let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" TYPE ${column.columnBody.dataType}(${column.columnBody.qWidth}${column.columnBody.qDecimalPlace})` 
                             addConstraints.push(statement)
                         } else {
-                            let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} TYPE ${column.columnBody.dataType}${column.columnBody.qWidth}` 
+                            let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" TYPE ${column.columnBody.dataType}${column.columnBody.qWidth}` 
                             addConstraints.push(statement)
                         }
                     } else if(column.columnBody.Width == 'NO'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} TYPE ${column.columnBody.dataType}`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" TYPE ${column.columnBody.dataType}`
                         removeConstraints.push(statement)
                     } 
                 }
                 if(keys.includes('Unique')){
                     if(column.columnBody.Unique == 'YES'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} SET UNIQUE`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" SET UNIQUE`
                         addConstraints.push(statement)
                     } else if(column.columnBody.Unique == 'NO'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} DROP UNIQUE`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" DROP UNIQUE`
                         removeConstraints.push(statement)
                     } 
                 }
                 if(keys.includes('DecimalPlace')){
                     if(column.columnBody.DecimalPlace == 'YES'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} TYPE Decimal(${column.columnBody.qWidth}${column.columnBody.qDecimalPlace})`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" TYPE Decimal(${column.columnBody.qWidth}${column.columnBody.qDecimalPlace})`
                         addConstraints.push(statement)
                     } else if(column.columnBody.DecimalPlace == 'NO'){
-                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN ${column.columnHead} TYPE Decimal(${column.columnBody.qWidth})`
+                        let statement = `ALTER TABLE ${this.table_fullname} ALTER COLUMN "${column.columnHead}" TYPE Decimal(${column.columnBody.qWidth})`
                         removeConstraints.push(statement)
                     } 
                 }
 
                 addConstraints.map(i=>{
-                    //console.log(i)
+                    console.log(i)
                     this.conn.query(i,(err)=>{
+                        // console.log(i)
                         if(err) throw err
                     })
                 })
@@ -2089,7 +2199,7 @@ class QuickTable{
                 statements.push(statement1)
                 
             }else if(this.db_name === 'psql' && q.columnBody.DataType === 'YES'){
-                let  __r__ = `${q.columnHead.toString()} TYPE ${q.columnBody.dataType.toString()} USING ${q.columnHead.toString()}::${q.columnBody.dataType}`
+                let  __r__ = `"${q.columnHead.toString()}" TYPE ${q.columnBody.dataType.toString()} USING "${q.columnHead.toString()}"::${q.columnBody.dataType}`
                 var statement1 = statement+__r__
                 statements.push(statement1)
                 
@@ -2131,6 +2241,7 @@ class QuickTable{
         statements.map(x=>{
             this.conn.query(x,(err)=>{
                 if(err) throw err 
+                m2mList.length == 0 ? this.endConnection() : null
                 console.log(`Updated column ${q.columnHead} in Table ${this.table_fullname}`)
             })
         })
@@ -2139,7 +2250,8 @@ class QuickTable{
     }
 
     DropColumn(q){
-        var query = `ALTER TABLE ${this.table_fullname} DROP COLUMN  ${q.column}`;
+        var query = this.db_name == 'psql' ? `ALTER TABLE ${this.table_fullname} DROP COLUMN  "${q.column}"` 
+                    : `ALTER TABLE ${this.table_fullname} DROP COLUMN  ${q.column}`;
 
         var SqliteDropColumn = ()=>{
 
@@ -2207,6 +2319,7 @@ class QuickTable{
         }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
             this.conn.query(query,(err)=>{
                 if(err) throw err
+                !q.m2m ? this.endConnection() : null
                 console.log(`Dropped column ${q.column} from Table ${this.table_fullname}`)
             })
         }
@@ -2220,10 +2333,12 @@ class QuickTable{
             if(this.db_name === 'sqlite3'){
                 this.conn.run(qq,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                 this.conn.query(qq,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }
         }
@@ -2247,20 +2362,24 @@ class QuickTable{
             if(this.db_name === 'sqlite3'){
                 this.conn.run(query,params,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                 this.conn.query(query,params,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }
         } else {
             if(this.db_name === 'sqlite3'){
                 this.conn.run(query2,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                 this.conn.query(query2,(err)=>{
                     if(err) throw err
+                    this.endConnection()
                 })
             }
         }
@@ -2271,7 +2390,7 @@ class QuickTable{
 var initDataType = ( arg )=>{
 
     function field( argF ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUpdate = '';
@@ -2328,7 +2447,7 @@ class DataType{
     }
 
     qBigInt( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2349,7 +2468,7 @@ class DataType{
     }
 
     qBit( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var primaryKey = '';
@@ -2381,7 +2500,7 @@ class DataType{
     }
 
     qSmallInt( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2402,7 +2521,7 @@ class DataType{
     }
 
     qDecimal( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var primaryKey = '';
         var qWidth = 10;
@@ -2425,7 +2544,7 @@ class DataType{
     }
 
     qSmallMoney( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var primaryKey = false;
@@ -2444,7 +2563,7 @@ class DataType{
     }
 
     qInt( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL';
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2462,7 +2581,7 @@ class DataType{
         var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
         let output;
-        if(db_connection.db_name === 'sqlite3'){
+        if(this.db_name === 'sqlite3'){
             output = {value:`Integer ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey, rename, dataType:'Integer',...__args__}
         } else {
             output = {value:`Int${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey, rename, dataType:'Int',...__args__}
@@ -2472,7 +2591,7 @@ class DataType{
     }
 
     qTinyInt( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2493,7 +2612,7 @@ class DataType{
     }
 
     qMoney( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique
         var primaryKey = '';
@@ -2512,7 +2631,7 @@ class DataType{
     }
 
     qFloat( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = 10;
         var qDecimalPlace = 2;
@@ -2535,7 +2654,7 @@ class DataType{
     }
 
     qDate( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var qAutoUpdate = false
@@ -2560,7 +2679,7 @@ class DataType{
     }
 
     qDatetime( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var qAutoUpdate = false;
@@ -2586,7 +2705,7 @@ class DataType{
     }
 
     qSmallDatetime( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qAutoUpdate = false;
         var primaryKey = false;
@@ -2610,7 +2729,7 @@ class DataType{
     }
 
     qTime( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qAutoUpdate = false
         var primaryKey = '';
@@ -2682,7 +2801,7 @@ class DataType{
     }
 
     qText( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var primaryKey = false;
@@ -2748,7 +2867,7 @@ class DataType{
     }
 
     qNText( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qUnique = '';
         var primaryKey = false;
@@ -2767,7 +2886,7 @@ class DataType{
     }
 
     qBinary( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2788,7 +2907,7 @@ class DataType{
     }
 
     qVarBinary( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var qWidth = '';
         var qUnique = '';
@@ -2809,7 +2928,7 @@ class DataType{
     }
 
     qImage( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var primaryKey = false;
         var rename = [false, null];
@@ -2826,7 +2945,7 @@ class DataType{
     }
 
     qBoolean( arg ) {
-        var qNull = '';
+        var qNull = 'NOT NULL'
         var qDefaultValue = '';
         var primaryKey = false;
         var rename = [false, null] ;
@@ -2854,54 +2973,4 @@ class DataType{
     }
 }
 
-//var __ = new DataType()
-//var e = {favourite:Operators().isIn(['blue']),male:true}
-//var myTable2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),age:__.qInt()})
-//var myTable4 = new QuickTable('MADZ_old',{name:__.qVarchar({width:100}),age:__.qInt()})
-//var myTable5 = new QuickTable('MADZ_proto_',{name:__.qVarchar({width:100}),age:__.qInt()})
-//var myTable = new QuickTable('MADZ',{name:__.qVarchar({Null:false,unique:true,width:100}),soli:__.qM2MKey('SOLI'),ace:__.qInt()})
-//var myTable3 = new QuickTable('Capacity', {ike:__.qJson(),height:__.qInt(),muscleSize:__.qVarchar({width:10,primaryKey:true}), madz:__.qForeignKey('SOLI'),age:__.qBoolean()})
-//myTable.insert({name:'cs',soli:Operators().m2mI([2],2),age:'20'});
-//myTable2.insert({name:'ie',age:'20'});
-//myTable3.insert({muscleSize:'big',madz:4,height:22,age:20,ike:[3,4,5]})
-/*var c = (async()=>{
-    //let response2 = await myTable.extract({id:[[2,4]]},{m2mValue:{soli:'*'}})
-    //let key = response2[response2.length-1].id+1
-    //myTable.insert({name:'nw',soli:Operators().m2mI([2],key),age:'20'});
-    //myTable2.insert({name:'ike',age:'20'});
-    //let response = await myTable2.find({id:1})
-    let response3 = await myTable3.all()
-    //let appendData = myTable.append(response3,{love:m,passion:response},{love:{Join:'leftJoin'},passion:{Joiner:['id','madz'],Join:'innerJoin'}})
-    //myTable.m2mA(response2[0],['soli',[2]])
-    //myTable.m2mD(response2[0],['soli',[2]])
-    //console.log(response2[0])
-    //console.log(response)
-    //console.log(response3)
-    /*var s = await myTable2.getM2MChild(response,{
-        Table:myTable,
-        Query:{
-            name:'nwa'
-        },
-        QuerySupplement:{
-            m2mValue:{
-                soli:'name'
-            }
-        }
-    })
-    //var d = await myTable.rawHTML({statement:`SELECT * FROM xatisfy_MADZ`,statementType:'fetchWhere',JSON:true})
-    //console.log(s[0].soli)
-    console.log(response3)
-})()*/
-// myTable2.create()
-// myTable.create()
-//myTable3.drop()
-// myTable4.drop()
-// myTable5.drop()
-// var dataTy = {"ike":{"value":"Varchar(100)   NOT NULL","JSON":true,"dataType":"Varchar","qWidth":100},"height":{"value":"Int   ","primaryKey":"","dataType":"Int","qNull":"","qDefaultValue":"","qWidth":"","qUnique":""},"muscleSize":{"value":"Varchar(10)   NOT NULL","primaryKey":true,"dataType":"Varchar","qNull":"NOT NULL","qDefaultValue":"","qWidth":"(10)","qUnique":""},"madz":{"value":"Int   ","referencedTable":"SOLI","dataType":"Int"},"age":{"value":"Int   ","primaryKey":"","dataType":"Int",}}
-// myTable3.UpdateColumn({Table:"Table3",DT:dataTy})
-/*var t = initDataType({name:'MADZWORLD',Width:true,Update:true,Delete:true,DefaultValue:true, Decimal_Places:true})
-var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width:10,primaryKey:false, decimal_places:10})
-console.log(d)*/
-
 module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
-//module.exports = {myTable2,myTable,myTable3}
