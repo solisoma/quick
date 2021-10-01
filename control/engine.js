@@ -58,7 +58,7 @@ let psql = (val)=>{
         database: val.database,
         ssl: val.ssl ? val.ssl : false,
         max: val.max ? val.max : 100,
-        idleTimeoutMillis: val.idleTimeoutMillis ? val.idleTimeoutMillis : 1000,
+        idleTimeoutMillis: val.idleTimeoutMillis ? val.idleTimeoutMillis : 2000,
         connectionTimeoutMillis: val.connectionTimeoutMillis ? val.connectionTimeoutMillis : 10000,
         maxUses: val.maxUses ? val.maxUses : 7500
     })

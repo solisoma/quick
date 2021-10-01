@@ -267,6 +267,12 @@ class QuickTable{
         this.table_fullname = `${this.app_name}_${this.table_name}` //table_fullname
         this.db_instances = db_instances //All the instances [column and its datatypes]
         this.force = force //tells the commands to drop and create table if set to true
+        this.SQLs = ['psql','mysql','sqlite3'] //accepted SQLs
+        this.allow = false //flag
+        this.SQLs.map(i=>{
+            if(i == this.db_name) this.allow = true
+        })
+        if(!this.allow) throw 'incorect SQL name check settings';
 
     }
 
@@ -604,7 +610,7 @@ class QuickTable{
             }
             statement+=`${constraints})`
 
-            //console.log(statement)
+            console.log(statement)
 
             if(this.db_name === 'sqlite3'){
                 this.conn.run(statement,(err)=>{
@@ -783,19 +789,19 @@ class QuickTable{
              psql_i++
         }
 
-        for(var i in this.db_instances){
-            var y = parameter.length+1
-            if(this.db_instances[i].dataType === ('Date'||'SmallDateTime'||'DateTime'||'Time') && this.db_instances[i].AutoUpdate){
-                __columns__+=this.db_name == 'psql' ? `"${i}"`: `${i}`;
-                parameter.push(this.db_instances[i].AutoFunc())
+        // for(var i in this.db_instances){
+        //     var y = parameter.length+1
+        //     if(this.db_instances[i].dataType === ('Date'||'SmallDateTime'||'DateTime'||'Time') && this.db_instances[i].AutoUpdate){
+        //         __columns__+=this.db_name == 'psql' ? `"${i}"`: `${i}`;
+        //         parameter.push(this.db_instances[i].AutoFunc())
 
-                __values__+= this.db_name === 'sqlite3' ? ',?'
-                : this.db_name === 'mysql' ? ',?'
-                : this.db_name === 'psql' ? `,$${y}`
-                : null
-                y++
-            }
-        }
+        //         __values__+= this.db_name === 'sqlite3' ? ',?'
+        //         : this.db_name === 'mysql' ? ',?'
+        //         : this.db_name === 'psql' ? `,$${y}`
+        //         : null
+        //         y++
+        //     }
+        // }
         __columns__+=')'
         __values__+=')'
         statement = `${__columns__} VALUES ${__values__}`
@@ -2580,12 +2586,7 @@ class DataType{
         }
         var __args__ = {qNull,qDefaultValue,qWidth,qUnique}
 
-        let output;
-        if(this.db_name === 'sqlite3'){
-            output = {value:`Integer ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey, rename, dataType:'Integer',...__args__}
-        } else {
-            output = {value:`Int${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey, rename, dataType:'Int',...__args__}
-        }
+        let output = {value:`Int${qWidth} ${qDefaultValue} ${qUnique} ${qNull}`,primaryKey, rename, dataType:'Int',...__args__}
 
         return output
     }
@@ -2667,15 +2668,18 @@ class DataType{
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
+            arg.AutoUpdate ? arg.db_name == 'psql' ? qDefaultValue = `DEFAULT CURRENT_DATE` 
+            : arg.db_name == 'mysql' ? qDefaultValue = `DEFAULT CURDATE()`
+            : arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATE()` : null
+            : qAutoUpdate = false
         }
 
-        function AutoFunc(){
-            return new Date().toDateString()
-        }
+        // function AutoFunc(){
+        //     return new Date().toDateString()//CURDATE() psql CURRENT_DATE sqlite3 DATE()
+        // }
 
         var __args__ = {qNull,qUnique,qDefaultValue,qAutoUpdate}
-        return {value:`Date ${qDefaultValue} ${qNull}`,primaryKey,rename,AutoFunc,dataType:'Date',...__args__}
+        return {value:`Date ${qDefaultValue} ${qNull}`,primaryKey,rename,dataType:'Date',...__args__}
     }
 
     qDatetime( arg ) {
@@ -2692,16 +2696,18 @@ class DataType{
             arg.qUnique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
+            arg.AutoUpdate ? arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
+            :qDefaultValue = `DEFAULT CURRENT_TIMESTAMP` 
+            : qAutoUpdate = false
         }
 
-        function AutoFunc(){
-            return new Date().toISOString()
-        }
-
+        // function AutoFunc(){
+        //     return new Date().toISOString()
+        // }
+        var name = arg.db_name == 'psql' ? 'TIMESTAMP' : 'DATETIME'
         var __args__ = {qNull,qDefaultValue,qUnique,qAutoUpdate}
 
-        return {value:`DateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey,rename,AutoFunc,dataType:'DateTime',...__args__}
+        return {value:`${name} ${qDefaultValue} ${qNull}`,primaryKey,rename,dataType:'DateTime',...__args__}
     }
 
     qSmallDatetime( arg ) {
@@ -2716,16 +2722,18 @@ class DataType{
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
+            arg.AutoUpdate ? arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
+            :qDefaultValue = `DEFAULT CURRENT_TIMESTAMP` 
+            : qAutoUpdate = false
         }
 
-        function AutoFunc(){
-            return new Date().toISOString()
-        }
+        // function AutoFunc(){
+        //     return new Date().toISOString()
+        // }
 
         var __args__ = {qNull,qDefaultValue,qAutoUpdate}
 
-        return {value:`SmallDateTime ${qDefaultValue} ${qNull} ON UPDATE CASCADE`,primaryKey,rename,AutoFunc,dataType:'SmallDateTime',...__args__}
+        return {value:`SmallDateTime ${qDefaultValue} ${qNull} `,primaryKey,rename,dataType:'SmallDateTime',...__args__}
     }
 
     qTime( arg ) {
@@ -2740,16 +2748,19 @@ class DataType{
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? qAutoUpdate = true : qAutoUpdate = false
+            arg.AutoUpdate ? arg.db_name == 'psql' ? qDefaultValue = `DEFAULT CURRENT_TIME` 
+            : arg.db_name == 'mysql' ? qDefaultValue = `DEFAULT CURTIME()`
+            : arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT TIME()` : null
+            : qAutoUpdate = false //psql current_time mysql curtime sqlite3 TIME()
         }
 
-        function AutoFunc(){
-            return new Date().toTimeString()
-        }
+        // function AutoFunc(){
+        //     return new Date().toTimeString()
+        // }
         
         var __args__ = {qAutoUpdate,qNull,qDefaultValue}
 
-        return {value:`Time ${qDefaultValue} ${qNull}`,primaryKey,rename,AutoFunc,dataType:'Time',...__args__}
+        return {value:`Time ${qDefaultValue} ${qNull}`,primaryKey,rename,dataType:'Time',...__args__}
     }
 
     qChar( arg ) {
@@ -2961,9 +2972,27 @@ class DataType{
         return {value:`Boolean ${qDefaultValue} ${qNull}`,primaryKey,rename, dataType:`Boolean`,...__args__}
     }
 
-    qForeignKey(referencedTable){
-        var {value} = this.qInt()
-        return {value,referencedTable,dataType:`Int`}
+    qForeignKey(referencedTable,arg){
+        // var Null = 'NOT NULL';
+        // var defaultValue = '';
+        // var width = '';
+        // var unique = '';
+        // var primaryKey = '';
+        // var rename = [false, null] ;
+
+        // if(arg){
+        //     arg.Null ? Null = '' : Null = 'NOT NULL'
+        //     arg.defaultValue && arg.defaultValue !== null && arg.defaultValue !== '' ? defaultValue = `DEFAULT '${arg.defaultValue}'` : defaultValue = ''
+        //     arg.primaryKey ? primaryKey = true : primaryKey = false
+        //     arg.rename ? rename = arg.rename : rename = [false, null]
+        //     arg.width ? width = arg.width : rename = [false, null]
+        //     arg.unique ? unique = `UNIQUE` : unique = ''
+        // }
+
+        var value;
+        arg ? value = this.qInt(arg) : value = this.qInt()
+
+        return {...value,referencedTable}
     }
 
     qM2MKey(motherTable){

@@ -13,6 +13,25 @@ var app_name = 'xatisfy'
 var settings = settings_({structures,connection,app_name})
 
 var myTable2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),LOVE:__.qVarchar({width:100,defaultValue:'yes',rename:[true,"Age"]})},settings)
+const flick = new QuickTable('flick',{
+            user_id : __.qForeignKey('users'),
+            desc : __.qText(), 
+            tele : __.qBoolean({
+                defaultValue : false
+            }),
+            flick : __.qBoolean({
+                defaultValue : false
+            }),
+            category : __.qVarchar({
+                width : 100
+            }),
+            date : __.qDatetime({
+                AutoUpdate : true,
+                db_name : 'psql'
+            })
+        },
+        settings
+)
 // var myTable4 = new QuickTable('MADZ_old',{name:__.qVarchar({width:100}),age:__.qInt()})
 //var myTable5 = new QuickTable('MADZ_proto_',{name:__.qVarchar({width:100}),age:__.qInt()})
 //var myTable = new QuickTable('MADZ',{name:__.qVarchar({Null:false,unique:true,width:100}),soli:__.qM2MKey('SOLI'),ace:__.qInt()})
@@ -59,4 +78,4 @@ var myTable2 = new QuickTable('SOLI',{name:__.qVarchar({width:100}),LOVE:__.qVar
 var d = t.field({Null:true,defaultValue:'soli',onUpdate:true,onDelete:true,width:10,primaryKey:false, decimal_places:10})
 console.log(d)*/
 
-module.exports = {myTable2/*,myTable,myTable3*/}
+module.exports = {myTable2,flick/*,myTable,myTable3*/}

@@ -32,6 +32,15 @@ function settings(constraints){
     let db_connection = connect(constraints.connection[0],constraints.connection[1])
     let app_name = constraints.app_name
     let structures = constraints.structures
+    try{
+        if(constraints.connection[0] == 'psql' && constraints.connection[1].idleTimeout){
+            if(constraints.connection[1].idleTimeout < 2000){
+                throw 'Please make sure the idleTimeout is greater than or equal to 2000'
+            }
+        }
+    }catch(err){
+        console.error(err)
+    }
     // let idleTimeout = constraints.connection[1].idleTimeout ? constraints.connection[1].idleTimeout : 1000
     //structures location i:e the path to all your structures
     return {db_connection,app_name,structures}

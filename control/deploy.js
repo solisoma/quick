@@ -89,9 +89,9 @@ function deploy(constraints){
                     })
 
                     Commands.Create.map(x=>{
-                        //setTimeout(()=>{
+                        setTimeout(()=>{
                             files[x] ? files[x].create()  : null
-                        //},800)
+                        },1500)
                     })
                 })
             })
