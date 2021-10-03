@@ -69,7 +69,7 @@ function deploy(constraints){
                         droppingTable.push(`${mainTable}`)
                         droppingTable.map(a=>{
                             var q =`DROP TABLE IF EXISTS ${a} ${cascade}`
-                            console.log(q)
+                            // console.log(q)
                             if(db_connection.db_name === 'sqlite3'){
                                 db_connection.connector.run(q,(err)=>{
                                     if(err) throw err;

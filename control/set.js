@@ -69,8 +69,9 @@ function set(constraints){
         currentDate = Date.now();
     } while (currentDate - date < milliseconds);
     }*/
+    const checkTables = require(`${RootDirectory}/QT_FOLDER/ToDeployFiles/${FILE[FILE.length-1]}`)
 
-    if(FILE.length === 0){
+    if(FILE.length === 0 || Object.keys(checkTables.tables).length == 0){
 
         structures.map(itm=>{
             const files = require(`${RootDirectory}/${itm}`)

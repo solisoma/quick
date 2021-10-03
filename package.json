@@ -1,6 +1,6 @@
 {
   "name": "qtable",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A Multi dialect ORM package use to manipulate the database. Using simple and easy to understand functions and methods",
   "main": "public_access.js",
   "scripts": {

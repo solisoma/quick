@@ -53,8 +53,8 @@ function Operators(){
         return {m2m:true,values,key}
     }
     //many to many query
-    let m2mQ = (values,/*contains*/) => {
-        return {m2m:true,values/*,...contains*/}
+    let m2mQ = (values,containAll=false/*contains*/) => {
+        return {m2m:true,values,containAll/*,...contains*/}
     }
 
     let jsonQ = (values,/*contains*/) => {
@@ -610,17 +610,19 @@ class QuickTable{
             }
             statement+=`${constraints})`
 
-            console.log(statement)
+            // console.log(statement)
 
             if(this.db_name === 'sqlite3'){
                 this.conn.run(statement,(err)=>{
                     if(err) throw err
                     m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
+                    console.log(`table "${this.table_fullname}" is created`)
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){ 
                 this.conn.query(statement,(err)=>{
                     if(err) throw err
                     m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
+                    console.log(`table "${this.table_fullname}" is created`)
                     // console.log('TABLE CREATED')
                 })
             }
@@ -1032,22 +1034,21 @@ class QuickTable{
                     var m2mSearch = '';
                     for(var i=0; i<m2mList.length; i++){
                         for(var n in m2mList[i]){
-                            var m2mCount = 1, m2mParam = []
+                            var m2mParam = []
                             m2mList[i][n].values.map((k,l)=>{
                                 if( i === m2mList.length-1 && l === m2mList[i][n].values.length-1 ){
                                     m2mSearch+=this.db_name === 'sqlite3' ? 'id_referenced_table = ?'
                                     : this.db_name === 'mysql' ? 'id_referenced_table = ?'
-                                    : this.db_name === 'psql' ? `id_referenced_table = $${m2mCount}`
+                                    : this.db_name === 'psql' ? `id_referenced_table = $${1+l}`
                                     : null
                                     m2mParam.push(k)
                                 } else {
                                     m2mSearch+=this.db_name === 'sqlite3' ? 'id_referenced_table = ? OR'
                                     : this.db_name === 'mysql' ? 'id_referenced_table = ? OR'
-                                    : this.db_name === 'psql' ? `id_referenced_table = $${m2mCount} OR`
+                                    : this.db_name === 'psql' ? `id_referenced_table = $${1+l} OR`
                                     : null
                                     m2mParam.push(k)
                                 }
-                                m2mCount++
                             })
                             m2mSearch+=` AND deleted = false`
                             let {table} = this.knowTable(n)
@@ -1076,7 +1077,8 @@ class QuickTable{
                         }
                     }
 
-                    //***
+                    //verify if the response must all have the require m2mValue
+                    //if yes and if it does not contain all change response to null
                     m2mList.map((i,j)=>{
                         for(var n in i){
                             if(response[n].length === 0 && !(i[n].containAll)){
@@ -1361,18 +1363,18 @@ class QuickTable{
                     var m2mSearch = '';
                     for(var i=0; i<m2mList.length; i++){
                         for(var n in m2mList[i]){
-                            var m2mCount = 1, m2mParam = [];
+                            var m2mParam = [];
                             m2mList[i][n].values.map((k,l)=>{
                                 if( i === m2mList.length-1 && l === m2mList[i][n].values.length-1 ){
                                     m2mSearch+=this.db_name === 'sqlite3' ? 'id_referenced_table = ?'
                                     : this.db_name === 'mysql' ? 'id_referenced_table = ?'
-                                    : this.db_name === 'psql' ? `id_referenced_table = $${m2mCount}`
+                                    : this.db_name === 'psql' ? `id_referenced_table = $${1+l}`
                                     : null
                                     m2mParam.push(k)
                                 } else {
                                     m2mSearch+=this.db_name === 'sqlite3' ? 'id_referenced_table = ? OR'
                                     : this.db_name === 'mysql' ? 'id_referenced_table = ? OR'
-                                    : this.db_name === 'psql' ? `id_referenced_table = $${m2mCount} OR`
+                                    : this.db_name === 'psql' ? `id_referenced_table = $${1+l} OR`
                                     : null
                                     m2mParam.push(k)
                                 }
@@ -1588,7 +1590,7 @@ class QuickTable{
         let main_query = m_query
 
         //append the value of each in the child table to the mother table
-        var add = (m,y,z,lk,mk,pop,full_join,y_m)=>{
+        var add = (m,y,z,lk,mk,array_limit,pop,full_join,y_m)=>{
             let result = m
             if(Array.isArray(m)) {
                 m.map((i,x)=>{
@@ -1597,7 +1599,11 @@ class QuickTable{
                             result[x][z] = Array(result[x][z])
                             result[x][z].push(y)
                         } else if(Array.isArray(result[x][z])){
-                            result[x][z].push(y)
+                            if( array_limit === null ){
+                                result[x][z].push(y)
+                            } else if(result[x][z].length !== array_limit){
+                                result[x][z].push(y)
+                            }
                         }else{
                             result[x][z] = y
                         }
@@ -1613,7 +1619,11 @@ class QuickTable{
                             result[z] = Array(result[z])
                             result[z].push(y)
                         } else if(Array.isArray(result[z])){
-                            result[z].push(y)
+                            if( array_limit === null ){
+                                result[z].push(y)
+                            } else if(result[z].length !== array_limit){
+                                result[z].push(y)
+                            }
                         }else{
                             result[z] = y
                         }
@@ -1626,20 +1636,22 @@ class QuickTable{
 
         //function for left joining
         function LeftJoin(a_query,join,main_query,pop,full_join){
-            let lk,mk;
+            let lk,mk,array_limit;
             join[n].Joiner ? mk = join[n].Joiner[0] : mk = 'id'
             join[n].Joiner ? lk = join[n].Joiner[1] : lk = 'id'
+            join[n].arrayLimit ? array_limit = join[n].arrayLimit : array_limit = null
+
 
             if( Array.isArray(main_query) ) {
                main_query.map((itm)=>{itm[n] = null})
                a_query[n].map(y=>{
-                    var get_it = add(main_query,y,n,lk,mk,pop,full_join,a_query[n])
+                    var get_it = add(main_query,y,n,lk,mk,array_limit,pop,full_join,a_query[n])
                     main_query = get_it
                 })
             } else {
                 try{
                     main_query[n] = null
-                    var get_it = add(main_query,a_query[n],n,lk,mk,pop,full_join)
+                    var get_it = add(main_query,a_query[n],n,lk,mk,array_limit,pop,full_join)
                     main_query = get_it
                 } catch(err) {
                     console.error(err)
@@ -1650,21 +1662,23 @@ class QuickTable{
 
         //function for right joining
         function RightJoin(a_query,join,main_query){
-            let lk,mk;
+            let lk,mk,array_limit;
             join[n].Joiner ? mk = join[n].Joiner[0] : mk = 'id'
             join[n].Joiner ? lk = join[n].Joiner[1] : lk = 'id'
+            join[n].arrayLimit ? array_limit = join[n].arrayLimit : array_limit = null
+
             if( Array.isArray(a_query[n]) ) {
                a_query[n].map((itm)=>{itm[n] = null})
 
                var main_queryMap = main_query
                main_queryMap.map(y=>{
-                    var get_it = add(a_query[n],y,n,mk,lk)
+                    var get_it = add(a_query[n],y,n,mk,lk,array_limit)
                     main_query = get_it
                 })
             } else {
                 try{
                     a_query[n][n] = null
-                    var get_it = add(a_query[n],main_query,n,mk,lk)
+                    var get_it = add(a_query[n],main_query,n,mk,lk,array_limit)
                     main_query = get_it
                 } catch(err){
                     console.error(err)
@@ -1877,7 +1891,7 @@ class QuickTable{
     }
 
     //handling raw codes
-    rawHTML(arg){
+    rawSQL(arg){
         var output = (async()=>{
             try{
                 var returnee = 'Command successful';
@@ -2001,7 +2015,7 @@ class QuickTable{
                 })
                 m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],this.table_fullname))
             } else if(q.columnBody.qNull.includes('NOT NULL') && !(q.columnBody.qDefaultValue.includes('DEFAULT'))){
-                throw `A default value must be specified when "${q.columnHead}" is set to NOT NULL`
+                throw `A default value must be specified when column"${q.columnHead}" is set to NOT NULL in table '${this.table_fullname}`
             }
         } catch(err) {
             console.error(err)
@@ -2170,7 +2184,7 @@ class QuickTable{
                 }
 
                 addConstraints.map(i=>{
-                    console.log(i)
+                    // console.log(i)
                     this.conn.query(i,(err)=>{
                         // console.log(i)
                         if(err) throw err
@@ -2393,7 +2407,7 @@ class QuickTable{
 }
 
 
-var initDataType = ( arg )=>{
+var createDataType = ( arg )=>{
 
     function field( argF ) {
         var qNull = 'NOT NULL'
@@ -2662,6 +2676,9 @@ class DataType{
         var primaryKey = false;
         var rename = [false, null];
 
+        if(!arg) throw 'no argument provided';
+        if(!arg.db_name) throw 'no db_name provided';
+
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
@@ -2690,6 +2707,9 @@ class DataType{
         var primaryKey = '';
         var rename = [false, null];
 
+        if(!arg) throw 'no argument provided';
+        if(!arg.db_name) throw 'no db_name provided';
+
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
@@ -2717,6 +2737,9 @@ class DataType{
         var primaryKey = false;
         var rename = [false, null];
 
+        if(!arg) throw 'no argument provided';
+        if(!arg.db_name) throw 'no db_name provided';
+
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
@@ -2742,6 +2765,9 @@ class DataType{
         var qAutoUpdate = false
         var primaryKey = '';
         var rename = [false, null];
+
+        if(!arg) throw 'no argument provided';
+        if(!arg.db_name) throw 'no db_name provided';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
@@ -3002,4 +3028,4 @@ class DataType{
     }
 }
 
-module.exports = {QuickTable,Ops:Operators(),__:new DataType(),initDataType}
+module.exports = {QuickTable,Ops:Operators(),__:new DataType(),createDataType}
