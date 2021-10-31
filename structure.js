@@ -1020,7 +1020,7 @@ class QuickTable{
             if(where_clause) q+= `WHERE ${where_clause} `;
             q+=group_
             q+=order_
-            console.log(q,parameter)
+            // console.log(q,parameter)
             let response;
             try{
                 this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter,this.conn,true) : response = await getQueryB(q,parameter,this.conn,true) //query the DB
