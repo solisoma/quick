@@ -3,7 +3,8 @@ function deploy(constraints){
     // let path = require('path');
     let fs = require('fs')
     let {structures,db_connection} = constraints.settings
-    let RootDirectory = constraints.init 
+    let {RootDirectory} = constraints.init 
+    let {ModelDirectory} = constraints.init 
     let ToDeployFiles = `${RootDirectory}/QT_FOLDER/ToDeployFiles`
     let {DeployedFileList} = require(`${RootDirectory}/QT_FOLDER/tracker.js`)
     let DeployFileBank = []
@@ -23,7 +24,7 @@ function deploy(constraints){
                 var {Commands} = require(`${ToDeployFiles}/${itm}`)
                 DeployedFileList2.push(itm)
                 structures.map(i=>{
-                    const files = require(`${RootDirectory}/${i}`)
+                    const files = require(`${ModelDirectory}/${i}`)
 
                     Commands.ChangeTableName.map(x=>{
                         files[x['Table']] ? files[x['Table']].ChangeTableName(x) : null

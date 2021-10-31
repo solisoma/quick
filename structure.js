@@ -46,7 +46,10 @@ function Operators(){
     let beginsWith = (a,con) => {
         var c = ''
         if(con){ c = con }
-        return `<{LIKE '${a}%'${c}}>`
+        function wrapper(i,w_con){
+            return `<{LIKE ${i}${w_con}}>`
+        }
+        return {wrapper,len:1,ops:true,params:[`${a}%`],c}
     }
     //many to many insert when inserting values
     let m2mI = (values,key) => {
@@ -66,15 +69,19 @@ function Operators(){
         var c = ''
         if(con){ c = con }
         function wrapper(i,w_con){
-            return `<{LIKE %${i}${w_con}}>`
+            return `<{LIKE ${i}${w_con}}>`
         }
-        return {wrapper,len:1,ops:true,params:[a],c}
+        return {wrapper,len:1,ops:true,params:[`%${a}`],c}
     }
 
     let begins_and_endswith = (start='null',end='null',con) => {
         var c = ''
         if(con){ c = con }
-        return `<{LIKE '${start}%${end}'${c}}>`
+        function wrapper(i,w_con){
+            return `<{LIKE ${i}${w_con}}>` 
+        }
+        return {wrapper,len:1,ops:true,params:[`${start}%${end}`],c}
+        
     }
 
     let notIn = (a,con) => {
@@ -143,7 +150,10 @@ function Operators(){
     let contains = (a,con) => {
         var c = ''
         if(con){ c = con }
-        return `<{LIKE '%${a}%'${c}}>`
+        function wrapper(i,w_con){
+            return `<{LIKE ${i}${w_con}}>`
+        }
+        return {wrapper,len:1,ops:true,params:[`%${a}%`],c}
     }
 
     let count = (a,comma=false) => {
@@ -317,7 +327,7 @@ class QuickTable{
         : null
     }
 
-    //used to read to read none operators and convert them to the right command
+    //used to read none operators and convert them to the right command
     //eg converts {a:soli__,b:madx} to a=soli OR b=madx 
     parseVal(val,count,fin){
         let conOrRegExp = /[A-Za-z0-9\.\:\;\#\$\%\^\&\*\_\-\@\?\/\,\s]+(\_{1})/igm //regExp to identify OR
@@ -388,7 +398,7 @@ class QuickTable{
         return result
     }
 
-    //used to read to read func and convert them to the right command
+    //used to read func and convert them to the right command
     //eg converts {a:soli__,b:madx} to a=soli OR b=madx 
     parseFuncVal(val,count,param,fin){
         let conOrRegExp = /[A-Za-z0-9\.\:\;\(\)\#\$\%\^\&\*\_\-\@\?\/\,\<\>\=\'\'\s]+(\_{1})/igm
@@ -2061,13 +2071,26 @@ class QuickTable{
 
     paginate(q){
         let limit = q.limit
-        let skip = q.skip
         let list = q.query
         var result;
+        if(q.except){
+            var totaLen = q.except.length+limit
+            var query_proto = list.slice(0,totaLen)
+            q.except.map(i=>{
+                query_proto.map(k=>{
+                    if(i==k.id){
+                        query_proto.splice(query_proto.indexOf(k),1)
+                    }
+                })
+            })
+            result = query_proto.slice(0,limit)
 
-        skip === undefined ? skip = 0 : null
-        limit === undefined ? limit = parseInt(list.length-1): null
-        result = list.slice(skip,limit+skip)
+        } else {
+            let skip = q.skip
+            skip === undefined ? skip = 0 : null
+            limit === undefined ? limit = parseInt(list.length-1): null
+            result = list.slice(skip,limit+skip)
+        }
         return result
     }
 

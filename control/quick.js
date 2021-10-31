@@ -1,5 +1,6 @@
-function init(){
-    const RootDirectory = process.cwd()
+function init(directory){
+    const RootDirectory = directory ? directory : process.cwd()
+    const ModelDirectory = process.cwd()
     const fs = require('fs')
 
     if(!(fs.readdirSync(RootDirectory).includes('QT_FOLDER'))){
@@ -55,7 +56,7 @@ function init(){
 
     // multiTask(alreadyExistingFiles,toBeCreatedFiles)
 
-    return RootDirectory
+    return {RootDirectory,ModelDirectory}
 }
 
 module.exports = init
