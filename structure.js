@@ -1020,7 +1020,7 @@ class QuickTable{
             if(where_clause) q+= `WHERE ${where_clause} `;
             q+=group_
             q+=order_
-            // console.log(q,parameter)
+            console.log(q,parameter)
             let response;
             try{
                 this.db_name == 'sqlite3' ? response = await getQueryA(q,parameter,this.conn,true) : response = await getQueryB(q,parameter,this.conn,true) //query the DB
@@ -1104,7 +1104,7 @@ class QuickTable{
                     for(var n in instances){
                         if(instances[n].motherTable){
                             let {table} = this.knowTable(n)
-                            var Qq = `SELECT id_main_table, id_referenced_table FROM ${table}`
+                            var Qq = `SELECT id_main_table, id_referenced_table FROM ${table} WHERE deleted = false`
                             var m2mQueryReturn;
                             this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[],this.conn) : m2mQueryReturn = await getQueryB(Qq,[],this.conn)
                             if(otherQuery.m2mValue === undefined || otherQuery.m2mValue[n] === undefined ){
@@ -1436,7 +1436,7 @@ class QuickTable{
                     for(var n in instances){
                         if(instances[n].motherTable){
                             let {table} = this.knowTable(n)
-                            var Qq = `SELECT id_main_table, id_referenced_table FROM ${table}`
+                            var Qq = `SELECT id_main_table, id_referenced_table FROM ${table} WHERE deleted = false` 
                             var m2mQueryReturn;
                             this.db_name == 'sqlite3' ? m2mQueryReturn = await getQueryA(Qq,[],this.conn) : m2mQueryReturn = await getQueryB(Qq,[],this.conn)
 
@@ -1783,8 +1783,11 @@ class QuickTable{
         return main_query
     }
 
+    // If Force check if there is and existing link with delete=true and change it to delete=false 
+    //else if none insert into the table 
+    // if not false check if there is an existing link if not insert
     //adding to m2m column
-    m2mA(ID,values){
+    m2mA(ID,values,check=true){
         let {table} = this.knowTable(values[0]) //getting the column
         let {id} = ID //getting the id
         //iterating through the to be added values
@@ -1794,34 +1797,91 @@ class QuickTable{
             : this.db_name === 'mysql' ? `INSERT INTO ${table} (id_main_table,id_referenced_table) VALUES (?,?)`
             : null
 
-            let qq = this.db_name === 'sqite3' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=?`
-            : this.db_name === 'psql' ? `SELECT * FROM ${table} WHERE id_main_table=$1 AND id_referenced_table=$2`
-            : this.db_name === 'mysql'  ?`SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=?`
+            let qq = this.db_name === 'sqite3' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=false`
+            : this.db_name === 'psql' ? `SELECT * FROM ${table} WHERE id_main_table=$1 AND id_referenced_table=$2 AND deleted=false`
+            : this.db_name === 'mysql'  ?`SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=false`
+            : null
+
+            let check_query = this.db_name === 'sqite3' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=true`
+            : this.db_name === 'psql' ? `SELECT * FROM ${table} WHERE id_main_table=$1 AND id_referenced_table=$2 AND deleted=true`
+            : this.db_name === 'mysql'  ?`SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=true`
             : null
 
             var param = [id,a]
             if(this.db_name === 'sqlite3'){
                 (async()=>{
-                    let QueryReturn = await getQueryA(qq,param,this.conn,true)
-                    //execute code only if QueryReturn is undefined
-                    if (QueryReturn === undefined ) {
-                        this.conn.run(q,param,(err)=>{
-                            if(err) throw err
-                            this.endConnection()
-                        })
+                    if(check){
+                        let FirstQueryReturn = await getQueryA(check_query,param,this.conn,true)
+                        if(FirstQueryReturn){
+                            //change to delete=false
+                            let pq = this.db_name === 'sqlite3' ? `UPDATE ${table} SET deleted=false WHERE id_main_table=? AND id_referenced_table=?`
+                            : this.db_name === 'psql' ?`UPDATE ${table} SET deleted=false WHERE id_main_table=$1 AND id_referenced_table=$2`
+                            : this.db_name === 'mysql' ? `UPDATE ${table} SET deleted=false WHERE id_main_table=? AND id_referenced_table=?`
+                            : null
+
+                            this.conn.run(pq,param,(err)=>{
+                                if(err) throw err
+                                this.endConnection()
+                            })
+
+                        } else {
+                            let QueryReturn = await getQueryA(qq,param,this.conn,true)
+                            //execute code only if QueryReturn is undefined
+                            if (QueryReturn === undefined ) {
+                                this.conn.run(q,param,(err)=>{
+                                    if(err) throw err
+                                    this.endConnection()
+                                })
+                            }
+                        }
+                    } else {
+                        let QueryReturn = await getQueryA(qq,param,this.conn,true)
+                        //execute code only if QueryReturn is undefined
+                        if (QueryReturn === undefined ) {
+                            this.conn.run(q,param,(err)=>{
+                                if(err) throw err
+                                this.endConnection()
+                            })
+                        }
                     }
                     //console.log(QueryReturn)
                 })()
             } else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
                (async()=>{
-                    let QueryReturn = await getQueryB(qq,param,this.conn,true)
-                    if (QueryReturn === undefined ) {
-                        this.conn.query(q,param,(err)=>{
-                            if(err) throw err
-                            this.endConnection()
-                        })
+                    if(check){
+                        let FirstQueryReturn = await getQueryB(check_query,param,this.conn,true)
+                        if(FirstQueryReturn){
+                            //change to delete=false
+                            let pq = this.db_name === 'sqlite3' ? `UPDATE ${table} SET delete=false WHERE id_main_table=? AND id_referenced_table=?`
+                            : this.db_name === 'psql' ?`UPDATE ${table} SET delete=false WHERE id_main_table=$1 AND id_referenced_table=$2`
+                            : this.db_name === 'mysql' ? `UPDATE ${table} SET delete=false WHERE id_main_table=? AND id_referenced_table=?`
+                            : null
+
+                            this.conn.run(pq,param,(err)=>{
+                                if(err) throw err
+                                this.endConnection()
+                            })
+
+                        } else {
+                            let QueryReturn = await getQueryB(qq,param,this.conn,true)
+                            //execute code only if QueryReturn is undefined
+                            if (QueryReturn === undefined ) {
+                                this.conn.run(q,param,(err)=>{
+                                    if(err) throw err
+                                    this.endConnection()
+                                })
+                            }
+                        }
+                    } else {
+                        let QueryReturn = await getQueryB(qq,param,this.conn,true)
+                        if (QueryReturn === undefined ) {
+                            this.conn.query(q,param,(err)=>{
+                                if(err) throw err
+                                this.endConnection()
+                            })
+                        }
+                        //console.log(QueryReturn)
                     }
-                    //console.log(QueryReturn)
                 })()
             }
         })
@@ -1829,7 +1889,7 @@ class QuickTable{
 
 
     //deleting from an m2m column
-    m2mD(ID,values){
+    m2mD(ID,values,force=false){
         let {table} = this.knowTable(values[0]) // getting the column
         let {id} = ID //getting the id
         //iterating through to  be inserted values
@@ -1839,9 +1899,14 @@ class QuickTable{
             : this.db_name === 'mysql' ? `DELETE FROM ${table} WHERE id_main_table=? AND id_referenced_table=?`
             : null
 
-            let qq = this.db_name === 'sqlite3' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=?`
-            : this.db_name === 'psql' ?`SELECT * FROM ${table} WHERE id_main_table=$1 AND id_referenced_table=$2`
-            : this.db_name === 'mysql' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=?`
+            let qq = this.db_name === 'sqlite3' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=false`
+            : this.db_name === 'psql' ?`SELECT * FROM ${table} WHERE id_main_table=$1 AND id_referenced_table=$2 AND deleted=false`
+            : this.db_name === 'mysql' ? `SELECT * FROM ${table} WHERE id_main_table=? AND id_referenced_table=? AND deleted=false`
+            : null
+
+            let pq = this.db_name === 'sqlite3' ? `UPDATE ${table} SET deleted=true WHERE id_main_table=? AND id_referenced_table=?`
+            : this.db_name === 'psql' ?`UPDATE ${table} SET deleted=true WHERE id_main_table=$1 AND id_referenced_table=$2`
+            : this.db_name === 'mysql' ? `UPDATE ${table} SET deleted=true WHERE id_main_table=? AND id_referenced_table=?`
             : null
 
             var param = [id,a]
@@ -1850,7 +1915,8 @@ class QuickTable{
                     let QueryReturn = await getQueryA(qq,param,this.conn,true)
                     //execute code only if QueryReturn is defined
                     if (QueryReturn) {
-                        this.conn.run(q,param,(err)=>{
+                        let main_statement = force ? pq : q
+                        this.conn.run(main_statement,param,(err)=>{
                             if(err) throw err
                             this.endConnection()
                         })
@@ -1862,7 +1928,8 @@ class QuickTable{
                     let QueryReturn = await getQueryB(qq,param,this.conn,true)
                     //console.log(q)
                     if (QueryReturn) {
-                        this.conn.query(q,param,(err)=>{
+                        let main_statement = force ? pq : q
+                        this.conn.query(main_statement,param,(err)=>{
                             if(err) throw err
                             this.endConnection()
                         })
@@ -2708,9 +2775,9 @@ class DataType{
             arg.unique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? arg.db_name == 'psql' ? qDefaultValue = `DEFAULT CURRENT_DATE` 
-            : arg.db_name == 'mysql' ? qDefaultValue = `DEFAULT CURDATE()`
-            : arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATE()` : null
+            arg.AutoUpdate ? arg.sql == 'psql' ? qDefaultValue = `DEFAULT CURRENT_DATE` 
+            : arg.sql == 'mysql' ? qDefaultValue = `DEFAULT CURDATE()`
+            : arg.sql == 'sqlite3' ? qDefaultValue = `DEFAULT DATE()` : null
             : qAutoUpdate = false
         }
 
@@ -2739,7 +2806,7 @@ class DataType{
             arg.qUnique ? qUnique = `UNIQUE` : qUnique = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
+            arg.AutoUpdate ? arg.sql == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
             :qDefaultValue = `DEFAULT CURRENT_TIMESTAMP` 
             : qAutoUpdate = false
         }
@@ -2747,7 +2814,7 @@ class DataType{
         // function AutoFunc(){
         //     return new Date().toISOString()
         // }
-        var name = arg.db_name == 'psql' ? 'TIMESTAMP' : 'DATETIME'
+        var name = arg.sql == 'psql' ? 'TIMESTAMP' : 'DATETIME'
         var __args__ = {qNull,qDefaultValue,qUnique,qAutoUpdate}
 
         return {value:`${name} ${qDefaultValue} ${qNull}`,primaryKey,rename,dataType:'DateTime',...__args__}
@@ -2768,7 +2835,7 @@ class DataType{
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
+            arg.AutoUpdate ? arg.sql == 'sqlite3' ? qDefaultValue = `DEFAULT DATETIME('now')` 
             :qDefaultValue = `DEFAULT CURRENT_TIMESTAMP` 
             : qAutoUpdate = false
         }
@@ -2797,9 +2864,9 @@ class DataType{
             arg.defaultValue && arg.defaultValue !== (null && '') ? qDefaultValue = `DEFAULT '${arg.defaultValue}'` : qDefaultValue = ''
             arg.primaryKey ? primaryKey = true : primaryKey = false
             arg.rename ? rename = arg.rename : rename = [false, null]
-            arg.AutoUpdate ? arg.db_name == 'psql' ? qDefaultValue = `DEFAULT CURRENT_TIME` 
-            : arg.db_name == 'mysql' ? qDefaultValue = `DEFAULT CURTIME()`
-            : arg.db_name == 'sqlite3' ? qDefaultValue = `DEFAULT TIME()` : null
+            arg.AutoUpdate ? arg.sql == 'psql' ? qDefaultValue = `DEFAULT CURRENT_TIME` 
+            : arg.sql == 'mysql' ? qDefaultValue = `DEFAULT CURTIME()`
+            : arg.sql == 'sqlite3' ? qDefaultValue = `DEFAULT TIME()` : null
             : qAutoUpdate = false //psql current_time mysql curtime sqlite3 TIME()
         }
 
