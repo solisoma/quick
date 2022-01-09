@@ -2767,7 +2767,7 @@ class DataType{
         var rename = [false, null];
 
         if(!arg) throw 'no argument provided';
-        if(!arg.db_name) throw 'no db_name provided';
+        if(!arg.sql) throw 'no sql provided in date';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
@@ -2798,7 +2798,7 @@ class DataType{
         var rename = [false, null];
 
         if(!arg) throw 'no argument provided';
-        if(!arg.db_name) throw 'no db_name provided';
+        if(!arg.sql) throw 'no sql provided in datetime';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
@@ -2828,7 +2828,7 @@ class DataType{
         var rename = [false, null];
 
         if(!arg) throw 'no argument provided';
-        if(!arg.db_name) throw 'no db_name provided';
+        if(!arg.sql) throw 'no sql provided in smalldatetime';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
@@ -2857,7 +2857,7 @@ class DataType{
         var rename = [false, null];
 
         if(!arg) throw 'no argument provided';
-        if(!arg.db_name) throw 'no db_name provided';
+        if(!arg.sql) throw 'no sql provided in time';
 
         if(arg){
             arg.Null ? qNull = '' : qNull = 'NOT NULL'
