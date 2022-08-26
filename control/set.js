@@ -18,6 +18,7 @@ function set(constraints){
     let checkDrop = []
     let AllStructures = {} //To get all tables as a dict for easy manipulation and knowing which table to drop 
     let Update_structure_tracker = {}
+    let genCommand = {};
     var FILE = fs.readdirSync(`${RootDirectory}/QT_FOLDER/ToDeployFiles`)
 
     function handleColumn(tableDetails,tables,a,i){
@@ -71,7 +72,7 @@ function set(constraints){
     } while (currentDate - date < milliseconds);
     }*/
 
-    if(FILE.length === 0 || Object.keys(checkTables.tables).length == 0){
+    if(FILE.length === 0){
 
         structures.map(itm=>{
             const files = require(`${ModelDirectory}/${itm}`)
@@ -80,6 +81,7 @@ function set(constraints){
             for(var i in files){
                 Update_structure_tracker[i] = files[i].collect()
                 Create.push(i)
+                genCommand[`create_${files[i].app_name}_${i}`] = false 
                 console.log(`\nCreating Table "${i}"`)
                 
             }
@@ -96,7 +98,6 @@ function set(constraints){
                 ChangeTableName
         }
     } else {
-        const checkTables = require(`${RootDirectory}/QT_FOLDER/ToDeployFiles/${FILE[FILE.length-1]}`)
         if(Object.keys(checkTables.tables).length == 0){
             structures.map(itm=>{
                 const files = require(`${ModelDirectory}/${itm}`)
@@ -105,6 +106,7 @@ function set(constraints){
                 for(var i in files){
                     Update_structure_tracker[i] = files[i].collect()
                     Create.push(i)
+                    genCommand[`create_${files[i].app_name}_${i}`] = false
                     console.log(`\nCreating Table "${i}"`)
                     
                 }
@@ -136,6 +138,7 @@ function set(constraints){
 
                     if(stopFlag === false && tables[i] === undefined || files[i].force){
                         Create.push(i)
+                        genCommand[`create_${files[i].app_name}_${i}`] = false
                         console.log(`\nCreating Table "${i}"`)
                         stopFlag = true
                         
@@ -144,6 +147,7 @@ function set(constraints){
                     if(stopFlag === false && tables[i].table_name !== tableDetails.table_name){
                         const New_TableName = {Table:i, old_name:tables[i].table_name, new_name:tableDetails.table_name}
                         ChangeTableName.push(New_TableName)
+                        genCommand[`change_tablename_${files[i].app_name}_${i}`] = false
                         console.log(`\nChanging Table name from "${tables[i].table_name}" to "${tableDetails.table_name}" in "${i}"`)
                         
                     }
@@ -152,6 +156,7 @@ function set(constraints){
                         if(stopFlag === false && !(tables[i].columns.includes(a)) && !(tableDetails.dataTypes[a].rename[0])){
                             const New_Column_Detail = {Table:i,columnHead:a,columnBody:tableDetails.dataTypes[a]}
                             New_Column.push(New_Column_Detail)
+                            genCommand[`new_column_${files[i].app_name}_${i}`] = false
                             console.log(`\nAdding New Column "${a}" in "${i}"`)
                             
                         }
@@ -161,6 +166,7 @@ function set(constraints){
                             var iH = tableDetails.dataTypes[a].rename[1]
                             const Rename_Column_Detail = {Table:i,columnHead:a,initialHead:iH}
                             Rename_Column.push(Rename_Column_Detail)
+                            genCommand[`rename_column_${files[i].app_name}_${i}`] = false
                             checkDrop.push(tableDetails.dataTypes[a].rename[1])
                             console.log(`\nRenaming Column "${iH}" to "${a}" in "${i}"`)
                             
@@ -184,6 +190,7 @@ function set(constraints){
                                 var inputColumn = handleColumn(tableDetails,tables,a,i)
                                 const Update_Column_Detail = {Table:i,/*DT:tables[i].dataTypes,*/columnHead:a,columnBody:{...tableDetails.dataTypes[a],PK,FK,m2m,...inputColumn}}
                                 Update_Column.push(Update_Column_Detail)
+                                genCommand[`update_column_${files[i].app_name}_${i}`] = false
                                 // console.log(Update_Column)
                                 console.log(`\nUpdating Column "${a}" in "${i}"`)
 
@@ -193,6 +200,7 @@ function set(constraints){
                                 const Drop_Column_Details = {Table:i,column:a,m2m}
                                 const New_Column_Details = {Table:i,columnHead:a,columnBody:tableDetails.dataTypes[a]}
                                 Update_SqliteColumn.push([Drop_Column_Details,New_Column_Details])
+                                genCommand[`update_sqlitecolumn_${files[i].app_name}_${i}`] = false
                                 console.log(`\nUpdating Column "${a}" in "${i}"`)
                             }
                         }
@@ -203,6 +211,7 @@ function set(constraints){
                 var stopFlag = false
                 if(stopFlag === false && AllStructures[i] === undefined){
                     Drop.push({instances:tables[i].dataTypes,table:tables[i].table_name,appName:tables[i].app_name})
+                    genCommand[`drop_${tables[i].app_name}_${i}`] = false
                     console.log(`\nDropping Table "${i}"`)
                     stopFlag = true
                     
@@ -218,6 +227,7 @@ function set(constraints){
                             if(tables[i].dataTypes[itm].motherTable) m2m=true;
                             const Drop_Column_Detail = {Table:i,column:itm,m2m}
                             Drop_Column.push(Drop_Column_Detail)
+                            genCommand[`drop_column_${tables[i].app_name}_${i}`] = false
                             console.log(`\nDropping Column "${itm}" in "${i}"`)
                             
                         }
@@ -256,19 +266,25 @@ function set(constraints){
                         `\t]`
         }
         
-        writetoDeployFileCommands += `\t${i}:${listCover},\n`
+        writetoDeployFileCommands += `\t${i}: ${listCover},\n`
     }
 
     var writetoDeployFileTables = '\n'
     for(var i in Update_structure_tracker){
         var keys = '\n'
         for(var k in Update_structure_tracker[i]){
-            keys += `\t\t${k}:${JSON.stringify(Update_structure_tracker[i][k])},\n`
+            keys += `\t\t${k}: ${JSON.stringify(Update_structure_tracker[i][k])},\n`
         }
         var keyCover = `{`+
                         `${keys}`+
                     `\t}`
-        writetoDeployFileTables += `\t${i}:${keyCover},\n`
+        writetoDeployFileTables += `\t${i}: ${keyCover},\n`
+    }
+
+    var writetoDeployConfirm = ''
+    for(var i in genCommand){
+        var keys = `\n\t${i}: ${genCommand[i]},`;
+        writetoDeployConfirm += keys
     }
 
     const CommandsI = {
@@ -295,7 +311,10 @@ function set(constraints){
                     `const tables = {`+
                         `${writetoDeployFileTables}`+
                     `}\n\n`+
-                    `module.exports = {Commands,tables}`
+                    `const confirmCommands = {`+
+                        `${writetoDeployConfirm}\n`+
+                    `}\n\n`+
+                    `module.exports = {Commands, tables, confirmCommands}`
                 )
             }else{
                 var checkFile = FILE[FILE.length-1].match(regExp)
@@ -304,10 +323,10 @@ function set(constraints){
                 var output;
 
                 if(checkFile.toString().length == 2 && add < 10){
-                    var main = '0'+add.toString()+'ToDeployFile.js'
+                    var main = `0${add.toString()}ToDeployFile.js`
                     output = main
                 }else{
-                    var main = add.toString()+'ToDeployFile.js'
+                    var main = `${add.toString()}ToDeployFile.js`
                     output = main
                 }
 
@@ -319,7 +338,10 @@ function set(constraints){
                     `const tables = {`+
                         `${writetoDeployFileTables}`+
                     `}\n\n`+
-                    `module.exports = {Commands,tables}`
+                    `const confirmCommands = {`+
+                        `${writetoDeployConfirm}\n\n`+
+                    `}\n\n`+
+                    `module.exports = {Commands, tables, confirmCommands}`
                 )
                 /*fs.writeFileSync(`${process.cwd()}/QT_FOLDER/structure_tracker.js`,
     `//contains the tables created column and features

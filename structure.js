@@ -2,6 +2,8 @@
 // var path = require('path')
 // let {db_connection,app_name} = require(`${path.dirname(path.dirname(process.cwd()))}/QT_FOLDER/settings.js`) //call the app_name and connection instance from setting
 
+const res = require("express/lib/response");
+
 //function for querying the database (sqlite3)
 
 // const reservedWords = [
@@ -541,104 +543,111 @@ class QuickTable{
             ON DELETE CASCADE ON UPDATE CASCADE
          )`
          //console.log(create_table)
-
-        if(this.db_name === 'sqlite3'){
-            this.conn.run(create_table,(err)=>{
-                if(err) throw err
-                this.endConnection()
-            })
-        }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
-            this.conn.query(create_table,(err)=>{
-                if(err) throw err
-                this.endConnection()
-            })
-        }
+        let {conn} = this
+        let {db_name} = this
+        return new Promise(res=>{
+            if(db_name === 'sqlite3'){
+                conn.run(create_table,(err)=>{
+                    if(err) throw err
+                    this.endConnection()
+                    res(true)
+                })
+            }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){
+                conn.query(create_table,(err)=>{
+                    if(err) throw err
+                    this.endConnection()
+                    res(true)
+                })
+            }
+        })
     }
     //create tables
-    create(a){
+    async create(a){
         this.checkMultiplePK()
-        var output = (async()=>{
-            var tableFullname;
-            this.PK = [] //tells number of pk
-            var instances;
-            a && a.table ? tableFullname = a.table : tableFullname = this.table_fullname
-            a && a.instances ? instances = a.instances : instances = this.db_instances
-            let autoIncrease;
-            let int;
-            let queryIt;
-            this.db_name === 'sqlite3' ? autoIncrease = `UNIQUE` 
-            : this.db_name === 'psql' ? autoIncrease = `SERIAL UNIQUE` 
-            : autoIncrease = `AUTO_INCREMENT UNIQUE`
+        var tableFullname;
+        this.PK = [] //tells number of pk
+        var instances;
+        a && a.table ? tableFullname = a.table : tableFullname = this.table_fullname
+        a && a.instances ? instances = a.instances : instances = this.db_instances
+        let autoIncrease;
+        let int;
+        let queryIt;
+        this.db_name === 'sqlite3' ? autoIncrease = `UNIQUE` 
+        : this.db_name === 'psql' ? autoIncrease = `SERIAL UNIQUE` 
+        : autoIncrease = `AUTO_INCREMENT UNIQUE`
 
-            this.db_name === 'sqlite3' ? int = `INTEGER` : int = `Int`
-            this.db_name === 'psql' ? queryIt = `id ${autoIncrease}` : queryIt = `id ${int} ${autoIncrease}`
-            var statement = `CREATE TABLE IF NOT EXISTS ${tableFullname}(${queryIt}`
+        this.db_name === 'sqlite3' ? int = `INTEGER` : int = `Int`
+        this.db_name === 'psql' ? queryIt = `id ${autoIncrease}` : queryIt = `id ${int} ${autoIncrease}`
+        var statement = `CREATE TABLE IF NOT EXISTS ${tableFullname}(${queryIt}`
 
-            //drop table before creating if force === true
-            if(this.force){
-                this.drop({drop:true})
-                statement = `CREATE TABLE ${tableFullname}(${queryIt}`
+        //drop table before creating if force === true
+        if(this.force){
+            this.drop({drop:true})
+            statement = `CREATE TABLE ${tableFullname}(${queryIt}`
+        }
+
+        let m2mList = [] //List containing all many to many instances
+        let constraints = ''
+        let PKEYS = this.db_name !== 'sqlite3' ? `CONSTRAINT PK_${tableFullname}__id PRIMARY KEY(id)` : 'id'
+
+        //Iterate over instances and manipulate on each to get the main value 
+        //converting them to sql command
+        for(var f in instances){
+            //If instance contains a many to many run the below command
+            if(instances[f].motherTable){
+                //map out many to many tables
+                var m2mTable = `${tableFullname}__${this.app_name}_${instances[f].motherTable}`
+                m2mList.push([`${this.app_name}_${instances[f].motherTable}`,m2mTable])
             }
+            let __r__ = this.db_name === 'psql' ?  `, "${f.toString()}" ${instances[f].value.toString()}` 
+                        : `, ${f.toString()} ${instances[f].value.toString()}` 
+            statement += __r__
 
-            let m2mList = [] //List containing all many to many instances
-            let constraints = ''
-            let PKEYS = this.db_name !== 'sqlite3' ? `CONSTRAINT PK_${tableFullname}__id PRIMARY KEY(id)` : 'id'
-
-            //Iterate over instances and manipulate on each to get the main value 
-            //converting them to sql command
-            for(var f in instances){
-                //If instance contains a many to many run the below command
-                if(instances[f].motherTable){
-                    //map out many to many tables
-                    var m2mTable = `${tableFullname}__${this.app_name}_${instances[f].motherTable}`
-                    m2mList.push([`${this.app_name}_${instances[f].motherTable}`,m2mTable])
-                }
-                let __r__ = this.db_name === 'psql' ?  `, "${f.toString()}" ${instances[f].value.toString()}` 
-                            : `, ${f.toString()} ${instances[f].value.toString()}` 
-                statement += __r__
-
-                //If instance contains a primaryKey run the below command
-                if ( instances[f].primaryKey ){
-                    if(this.db_name == 'sqlite3'){
-                        PKEYS = `${f}`
-                    } else {
-                        PKEYS = `CONSTRAINT PK_${tableFullname}__${f} PRIMARY KEY(${f})`
-                    }
-                }
-
-                //If instance contains a ForeignKey run the below command
-                if ( instances[f].referencedTable ){
-                    var {referencedTable} = instances[f]
-                    constraints += `, CONSTRAINT FK_${tableFullname}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
+            //If instance contains a primaryKey run the below command
+            if ( instances[f].primaryKey ){
+                if(this.db_name == 'sqlite3'){
+                    PKEYS = `${f}`
+                } else {
+                    PKEYS = `CONSTRAINT PK_${tableFullname}__${f} PRIMARY KEY(${f})`
                 }
             }
 
-            if(this.db_name !== 'sqlite3') {
-                constraints+=`, ${PKEYS}`;
-            } else {
-                constraints+=`, PRIMARY KEY(${PKEYS})`;
+            //If instance contains a ForeignKey run the below command
+            if ( instances[f].referencedTable ){
+                var {referencedTable} = instances[f]
+                constraints += `, CONSTRAINT FK_${tableFullname}__${f} FOREIGN KEY (${f}) REFERENCES ${this.app_name}_${referencedTable}(id) ON DELETE CASCADE ON UPDATE CASCADE`
             }
-            statement+=`${constraints})`
+        }
 
-            // console.log(statement)
+        if(this.db_name !== 'sqlite3') {
+            constraints+=`, ${PKEYS}`;
+        } else {
+            constraints+=`, PRIMARY KEY(${PKEYS})`;
+        }
+        statement+=`${constraints})`
 
-            if(this.db_name === 'sqlite3'){
-                this.conn.run(statement,(err)=>{
+        // console.log(statement)
+        var {conn} = this
+        var {db_name} = this
+
+        return new Promise(res=>{
+            if(db_name === 'sqlite3'){
+                conn.run(statement,(err)=>{
                     if(err) throw err
-                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
+                    m2mList.map(async(itm) => await this.createM2MTable(itm[0],itm[1],tableFullname))
                     console.log(`table "${this.table_fullname}" is created`)
+                    res({tableFullname,finsihed:true})
                 })
             }else if(this.db_name === 'psql' ||  this.db_name === 'mysql'){ 
-                this.conn.query(statement,(err)=>{
+                conn.query(statement,(err)=>{
                     if(err) throw err
-                    m2mList.map(itm=>this.createM2MTable(itm[0],itm[1],tableFullname))
+                    m2mList.map(async (itm)=> await this.createM2MTable(itm[0],itm[1],tableFullname))
                     console.log(`table "${this.table_fullname}" is created`)
+                    res({tableFullname,finsihed:true})
                     // console.log('TABLE CREATED')
                 })
             }
-            return tableFullname
-        })()
-        return output
+        })
     }
 
     //drops table if deleted from its structure's module

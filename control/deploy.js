@@ -2,6 +2,7 @@
 function deploy(constraints){
     // let path = require('path');
     let fs = require('fs')
+    let deploy_functions = require('./deploy_functions')
     let {structures,db_connection} = constraints.settings
     let {RootDirectory} = constraints.init 
     let {ModelDirectory} = constraints.init 
@@ -12,91 +13,55 @@ function deploy(constraints){
     let FILE = fs.readdirSync(ToDeployFiles)
 
     FILE.map(itm=>{
-    if(!(DeployedFileList.includes(itm))){
-        DeployFileBank.push(itm)
-    }
+        if(!(DeployedFileList.includes(itm))){
+            DeployFileBank.push(itm)
+        }
     })
+    
+    function sleep(milliseconds) {
+        const date = Date.now();
+        let currentDate = null;
+        do {
+            currentDate = Date.now();
+        } while (currentDate - date < milliseconds);
+    }
+
+    
     if(DeployFileBank.length === 0){
         console.log("\nNo table to deploy\n")
     } else {
-        try{
-            DeployFileBank.map(itm=>{
-                var {Commands} = require(`${ToDeployFiles}/${itm}`)
+        const completed = DeployFileBank.map(itm=>{
+            try{
+                var {Commands, confirmCommands} = require(`${ToDeployFiles}/${itm}`)
                 DeployedFileList2.push(itm)
-                structures.map(i=>{
+                structures.map(async(i)=>{
                     const files = require(`${ModelDirectory}/${i}`)
-
-                    Commands.ChangeTableName.map(x=>{
-                        files[x['Table']] ? files[x['Table']].ChangeTableName(x) : null
-                    })
-
-                    Commands.Update_Column.map(x=>{
-                        files[x['Table']] ? files[x['Table']].UpdateColumn(x) : null
-                    })
-
-                    Commands.Update_SqliteColumn.map(x=>{
-                        if( files[x[0]['Table']] ){
-                            files[x[0]['Table']].DropColumn(x[0])
-                            setTimeout(()=>{
-                                files[x[1]['Table']].AddColumn(x[1])
-                        
-                            },600)
-                        }
-                    })
-
-                    Commands.Rename_Column.map(x=>{
-                        files[x['Table']] ? files[x['Table']].RenameColumn(x) : null
-                    })
-                    
-                    Commands.New_Column.map(x=>{
-                        files[x['Table']] ? files[x['Table']].AddColumn(x) : null
-                    })
-
-                    Commands.Drop.map(x=>{
-                        var droppingTable = []
-
-                        var instances = x.instances
-                        var mainTable = x.table
-                        var appName = x.appName
-
-                        for(var n in instances){
-                            if(instances[n].motherTable){
-                                let table = `${mainTable}__${appName}_${instances[n].motherTable}`
-                                droppingTable.push(table)
-                            }
-                        }
-                        let cascade = ''
-                        db_connection.db_name !== 'sqlite3' && db_connection.db_name === 'psql'  ||  db_connection.db_name === 'mysql' ? cascade = 'CASCADE' : null ;
-                        droppingTable.push(`${mainTable}`)
-                        droppingTable.map(a=>{
-                            var q =`DROP TABLE IF EXISTS ${a} ${cascade}`
-                            // console.log(q)
-                            if(db_connection.db_name === 'sqlite3'){
-                                db_connection.connector.run(q,(err)=>{
-                                    if(err) throw err;
-                                    console.log(`${a} dropped`)
-                                })
-                            }else{
-                                db_connection.connector.query(q,(err)=>{
-                                    if(err) throw err
-                                    console.log(`${a} dropped`)
-                                })
-                            }
-                        })
-                    })
-                    
-                    Commands.Drop_Column.map(x=>{
-                        files[x['Table']] ? files[x['Table']].DropColumn(x) : null
-                    })
-
-                    Commands.Create.map(x=>{
-                        setTimeout(()=>{
-                            files[x] ? files[x].create()  : null
-                        },1500)
-                    })
+                    await deploy_functions(files,Commands,confirmCommands)
                 })
-            })
 
+                const regExp = /const confirmCommands[\s\=\{\w\_\:\,]+\}/igm
+                let toChangeFile = fs.readFileSync(`${ToDeployFiles}/${itm}`,'utf-8')
+                var writetoDeployConfirm = ''
+                for(var i in confirmCommands){
+                    var keys = `\n\t${i}: ${confirmCommands[i]},`;
+                    writetoDeployConfirm += keys
+                }
+                toChangeFile = toChangeFile.replace(regExp,
+                    `const confirmCommands = {`+
+                        `${writetoDeployConfirm}\n`+
+                    `}`)
+                fs.writeFileSync(`${ToDeployFiles}/${itm}`,toChangeFile)
+
+
+                return true
+            } catch(err){
+                console.error(err)
+                return false
+            }
+        })
+        
+        if(completed){
+            // Write to the tracker only if all executions are successfull
             var writeToTracker = '\n'
 
             DeployedFileList2.map(i=>{
@@ -111,11 +76,9 @@ function deploy(constraints){
             `module.exports = {DeployedFileList}
             `
             )
-
-        } catch(err){
-            console.error(err)
         }
     }
 }
+
 
 module.exports = deploy
